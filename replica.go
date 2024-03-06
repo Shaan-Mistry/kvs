@@ -66,6 +66,7 @@ func main() {
 	CURRENT_VIEW = strings.Split(os.Getenv("VIEW"), ",")
 	// Sync replica with the system
 	err := syncMyself()
+	// If there are no replicas to sync with, initialize empty vector clock
 	if err != nil {
 		MY_VECTOR_CLOCK = vclock.New()
 		for _, address := range CURRENT_VIEW {
@@ -120,7 +121,6 @@ func main() {
 	// Define /sync endpoint for syncing new nodes
 	e.GET("/sync", syncHandler)
 	// Build the JSON body to be sent: {"socket-address":"<IP:PORT>"}
-	//payload := fmt.Sprintf("{socket-address:%s}", SOCKET_ADDRESS)
 	payload := map[string]string{"socket-address": SOCKET_ADDRESS}
 	jsonPayload, _ := json.Marshal(payload)
 	// Broadcaset Put View message to all replicas in the system

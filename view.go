@@ -56,6 +56,5 @@ func deleteReplicaView(c echo.Context) error {
 			return c.JSON(http.StatusOK, map[string]string{"result": "deleted"})
 		}
 	}
-
 	return c.JSON(http.StatusNotFound, map[string]string{"error": "View has no such replica"})
 }
