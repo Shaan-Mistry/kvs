@@ -38,7 +38,6 @@ func heartbeat() {
 	client := &http.Client{Timeout: 1 * time.Second}
 	time.Sleep(time.Second)
 	for {
-		//<-time.After(1 * time.Second)
 		viewMutex.Lock() // Lock before reading CURRENT_VIEW
 		currentViewSnapshot := make([]string, len(CURRENT_VIEW))
 		copy(currentViewSnapshot, CURRENT_VIEW) // Create a copy to iterate over
