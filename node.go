@@ -87,6 +87,8 @@ func main() {
 	// Attempt to sync replica with another replica in the system
 	syncMyself(SHARD_COUNT)
 	fmt.Printf("Shard Map: %v\n", SHARDS)
+	// Create a hash ring to represent the distribution of shards
+	HASH_RING = createHashRing()
 	// Define Logger to display requests. Code from Echo Documentation
 	e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
 		LogStatus: true,
@@ -98,12 +100,12 @@ func main() {
 		},
 		LogValuesFunc: func(c echo.Context, v middleware.RequestLoggerValues) error {
 			kvs := c.Get("table")
-			vclock, _ := c.Get("vclock").(string)
+			//vclock, _ := c.Get("vclock").(string)
 			method := strings.ToUpper(v.Method)
 			if method == "GET" && v.URI == "/view" {
 				return nil
 			}
-			fmt.Printf("[%s] %v, status: %v, vclock: %v kvs: %v", method, v.URI, v.Status, vclock, kvs)
+			fmt.Printf("%s %v status: %v kvs: %v", method, v.URI, v.Status, kvs)
 			println()
 			return nil
 		},

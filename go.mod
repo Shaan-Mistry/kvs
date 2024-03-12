@@ -5,6 +5,8 @@ go 1.21.6
 require github.com/labstack/echo/v4 v4.11.4
 
 require (
+	github.com/buraksezer/consistent v0.10.0 // indirect
+	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
 	golang.org/x/time v0.5.0 // indirect
 )

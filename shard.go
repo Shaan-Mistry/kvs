@@ -3,28 +3,51 @@ package main
 import (
 	"net/http"
 
+	"github.com/buraksezer/consistent"
+	"github.com/cespare/xxhash"
 	"github.com/labstack/echo/v4"
-	"github.com/serialx/hashring"
 )
 
 // Define SHARDS to store nodes to respective shard ids
 var SHARDS = make(map[string][]string)
 
 // Define hash ring to represent the distribution of shards
-var HASH_RING *hashring.HashRing
+var HASH_RING *consistent.Consistent
 
-// Creates a new hash ring
-func createHashRing() *hashring.HashRing {
-	keys := make([]string, 0, len(SHARDS))
-	for key := range SHARDS {
-		keys = append(keys, key)
-	}
-	return hashring.New(keys)
+type myMember string
+
+func (m myMember) String() string {
+	return string(m)
 }
 
+// Define hash function to be used by the consistent hashing algorithm
+type hasher struct{}
+
+func (h hasher) Sum64(data []byte) uint64 {
+	// you should use a proper hash function for uniformity.
+	return xxhash.Sum64(data)
+}
+
+// Creates a new hash ring
+func createHashRing() *consistent.Consistent {
+	// Create a new consistent instance
+	cfg := consistent.Config{
+		PartitionCount:    7,
+		ReplicationFactor: 20,
+		Load:              1.25,
+		Hasher:            hasher{},
+	}
+	hashRing := consistent.New(nil, cfg)
+	for key := range SHARDS {
+		hashRing.Add(myMember(key))
+	}
+	return hashRing
+}
 
 // Each shard must contain at least two nodes to provide fault tolerance
-// Make sure that node sarrive to same sharding independentalty or through communication
+// Make sure that node arrive to same sharding independentalty or through communication
+// Any node should be able to determine what shard a key belongs to, without having to query every
+//shard for it
 
 // When to reshard?
 // When a shard contains one node due to the failure of other nodes
@@ -71,5 +94,3 @@ func addNodeToShard(c echo.Context) error {
 func reshard(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{"result": "resharded"})
 }
-
-

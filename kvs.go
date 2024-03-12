@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 
@@ -111,6 +112,11 @@ func putKey(c echo.Context) error {
 // Return the value of the indicated key
 func getKey(c echo.Context) error {
 	key := c.Param("key")
+
+	// Locate the shard that contains the key
+	keyByte := []byte(key)
+	shardid := HASH_RING.LocateKey(keyByte)
+	fmt.Printf("Shard ID: %s", shardid)
 
 	// Read JSON from request body
 	body, err := io.ReadAll(c.Request().Body)
