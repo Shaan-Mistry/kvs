@@ -23,7 +23,6 @@ func createHashRing() *hashring.HashRing {
 }
 
 
-
 // Each shard must contain at least two nodes to provide fault tolerance
 // Make sure that node sarrive to same sharding independentalty or through communication
 
@@ -72,3 +71,5 @@ func addNodeToShard(c echo.Context) error {
 func reshard(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{"result": "resharded"})
 }
+
+

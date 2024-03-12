@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -37,23 +38,38 @@ type Value struct {
 type Sync_Data struct {
 	KvsSync        string `json:"kvsCopy"`
 	VectorClockStr string `json:"vectorClock"`
+	ShardsString   string `json:"shard"`
 }
 
 // GET /sync
 func syncHandler(c echo.Context) error {
 	// Prepare the data to be sent back to the requesting replica
 
-	// Convert kvs map to JSON string
-	jsonString, err := json.Marshal(KVStore)
+	// Convert kvs map to JSON btes
+	jsonBytes, err := json.Marshal(KVStore)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, "Failed to convert kvs to string")
 	}
-	// Convert byte slice to string
-	kvsString := string(jsonString)
+
+	// Convert KVStore to string
+	kvsString := string(jsonBytes)
+
+	// Convert Shards to JSON bytes
+	jsonBytes, err = json.Marshal(SHARDS)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, "Failed to convert Shard Map to string")
+	}
+
+	// Convert Shards to string
+	shardsString := string(jsonBytes)
+
+	// Convert Vector Clock to string
+	vcString := MY_VECTOR_CLOCK.ReturnVCString()
 
 	syncData := Sync_Data{
 		KvsSync:        kvsString,
-		VectorClockStr: MY_VECTOR_CLOCK.ReturnVCString(),
+		VectorClockStr: vcString,
+		ShardsString:   shardsString,
 	}
 
 	// Send the current view and vector clock as a JSON response
@@ -64,17 +80,12 @@ func main() {
 	// Read environment variables
 	SOCKET_ADDRESS = os.Getenv("SOCKET_ADDRESS")
 	CURRENT_VIEW = strings.Split(os.Getenv("VIEW"), ",")
-	// Attempt to sync replica with another replica in the system
-	err := syncMyself()
-	// If there are no nodes to sync with, initialize an empty vector clock
-	if err != nil {
-		MY_VECTOR_CLOCK = vclock.New()
-		for _, address := range CURRENT_VIEW {
-			MY_VECTOR_CLOCK.Set(address, 0)
-		}
-	}
+	SHARD_COUNT, _ := strconv.Atoi(os.Getenv("SHARD_COUNT"))
+
 	// Define new Echo instance
 	e := echo.New()
+	// Attempt to sync replica with another replica in the system
+	syncMyself(SHARD_COUNT)
 	// Define Logger to display requests. Code from Echo Documentation
 	e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
 		LogStatus: true,

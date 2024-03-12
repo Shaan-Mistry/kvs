@@ -122,20 +122,42 @@ func compareReplicasVC(senderVC, recieverVC vclock.VClock, senderPos string) boo
 	return true
 }
 
-func syncMyself() error {
+func syncMyself(shardCount int) {
+	// Look for a node to sync with
 	for _, address := range CURRENT_VIEW {
-		err := syncWithCluster(address)
+		err := syncWithNode(address)
 		if err == nil {
-			return nil
+			return
 		}
-		println(err.Error())
 	}
-	return fmt.Errorf("failed to sync")
+	// If there is no nodes to sync with, initialize Vector Clock and SHARDS
+	// Initialize Vector Clock
+	MY_VECTOR_CLOCK = vclock.New()
+	for _, address := range CURRENT_VIEW {
+		MY_VECTOR_CLOCK.Set(address, 0)
+	}
+
+	// Delegate all nodes in current view to SHARDS map
+	nodesPerShard := len(CURRENT_VIEW) / shardCount
+	remainder := len(CURRENT_VIEW) % shardCount
+	// Create SHARD_COUNT shardids in the SHARDS map
+	for i := 0; i < shardCount; i++ {
+		shardid := fmt.Sprintf("shard%d", i)
+		// Assign len(CURRENT_VIEW)/SHARD_COUNT nodes to each shard
+		for j := 0; j < nodesPerShard; j++ {
+			SHARDS[shardid] = append(SHARDS[shardid], CURRENT_VIEW[nodesPerShard*i+j])
+		}
+	}
+	// Distribute the remainder nodes to the first few shards
+	for i := 0; i < remainder; i++ {
+		shardid := fmt.Sprintf("shard%d", i)
+		SHARDS[shardid] = append(SHARDS[shardid], CURRENT_VIEW[nodesPerShard*shardCount+i])
+	}
 }
 
 // Makes a request to existing replica to get the current view and vector clock
 // Updates the new replica's state based on the response
-func syncWithCluster(targetReplicaAddress string) error {
+func syncWithNode(targetReplicaAddress string) error {
 	client := &http.Client{
 		Timeout: 1 * time.Second, // Set a timeout to avoid hanging indefinitely
 	}
@@ -171,6 +193,15 @@ func syncWithCluster(targetReplicaAddress string) error {
 	if err != nil {
 		return fmt.Errorf("error creating kvs from string: %v", err)
 	}
+
+	var newShards map[string][]string
+	err = json.Unmarshal([]byte(syncData.ShardsString), &newShards)
+	if err != nil {
+		return fmt.Errorf("error creating shards from string: %v", err)
+	}
+
+	// Update SHARDS with the new shards
+	SHARDS = newShards
 
 	// Directly update MY_VECTOR_CLOCK with the new vector clock
 	MY_VECTOR_CLOCK = newVClock
