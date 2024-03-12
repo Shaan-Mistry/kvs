@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 
@@ -111,12 +110,15 @@ func putKey(c echo.Context) error {
 // GET /kvs/<key>
 // Return the value of the indicated key
 func getKey(c echo.Context) error {
+	// Check which shard the key belongs to
 	key := c.Param("key")
-
-	// Locate the shard that contains the key
 	keyByte := []byte(key)
-	shardid := HASH_RING.LocateKey(keyByte)
-	fmt.Printf("Shard ID: %s", shardid)
+	shardid := HASH_RING.LocateKey(keyByte).String()
+
+	// If shardid is NOT the same as MY_SHARD_ID, then forward the request to the appropriate shard
+	if shardid != MY_SHARD_ID {
+		return forwardRequest(c, choseNodeFromShard(shardid))
+	}
 
 	// Read JSON from request body
 	body, err := io.ReadAll(c.Request().Body)

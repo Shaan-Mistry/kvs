@@ -23,6 +23,9 @@ var MY_VECTOR_CLOCK vclock.VClock
 // Socket Address of the current View
 var SOCKET_ADDRESS string
 
+// Shard id that the current node belongs to
+var MY_SHARD_ID string
+
 // Protects access to CURRENT_VIEW
 var viewMutex sync.Mutex
 
@@ -86,7 +89,10 @@ func main() {
 	e := echo.New()
 	// Attempt to sync replica with another replica in the system
 	syncMyself(SHARD_COUNT)
-	fmt.Printf("Shard Map: %v\n", SHARDS)
+	// Store my shard id
+	updateMyShardID()
+	fmt.Printf("\nShard Map: %v\n", SHARDS)
+	fmt.Printf("\nMy ShardID: %s\n", MY_SHARD_ID)
 	// Create a hash ring to represent the distribution of shards
 	HASH_RING = createHashRing()
 	// Define Logger to display requests. Code from Echo Documentation
@@ -102,9 +108,9 @@ func main() {
 			kvs := c.Get("table")
 			//vclock, _ := c.Get("vclock").(string)
 			method := strings.ToUpper(v.Method)
-			if method == "GET" && v.URI == "/view" {
-				return nil
-			}
+			// if method == "GET" && v.URI == "/view" {
+			// 	return nil
+			// }
 			fmt.Printf("%s %v status: %v kvs: %v", method, v.URI, v.Status, kvs)
 			println()
 			return nil

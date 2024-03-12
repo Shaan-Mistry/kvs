@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
 	"github.com/DistributedClocks/GoVector/govec/vclock"
+	"github.com/labstack/echo/v4"
 )
 
 // Builds a new vector clock object given a string
@@ -35,9 +37,10 @@ func removeFromView(address string) {
 
 // Periodically check if a replica is still alive
 func heartbeat() {
-	client := &http.Client{Timeout: 1 * time.Second}
+	client := &http.Client{Timeout: 5 * time.Second}
 	time.Sleep(time.Second)
 	for {
+		time.Sleep(time.Second)
 		viewMutex.Lock() // Lock before reading CURRENT_VIEW
 		currentViewSnapshot := make([]string, len(CURRENT_VIEW))
 		copy(currentViewSnapshot, CURRENT_VIEW) // Create a copy to iterate over
@@ -125,6 +128,10 @@ func compareReplicasVC(senderVC, recieverVC vclock.VClock, senderPos string) boo
 func syncMyself(shardCount int) {
 	// Look for a node to sync with
 	for _, address := range CURRENT_VIEW {
+		// Dont sync with yourself
+		if address == SOCKET_ADDRESS {
+			continue
+		}
 		err := syncWithNode(address)
 		if err == nil {
 			return
@@ -211,4 +218,58 @@ func syncWithNode(targetReplicaAddress string) error {
 
 	fmt.Printf("Successfully synchronized with cluster via replica %s\n", targetReplicaAddress)
 	return nil
+}
+
+// Stores which shard the current node belongs to into MY_SHARD_ID
+func updateMyShardID() {
+	// Locate the shard that contains the key
+	// Look through all shards  in SHARDS values and find SOCKET_ADDRESS
+	for shardid, nodes := range SHARDS {
+		for _, address := range nodes {
+			if address == SOCKET_ADDRESS {
+				MY_SHARD_ID = shardid
+			}
+		}
+	}
+}
+
+// Chose a random node from the inputted shardid
+func choseNodeFromShard(shardid string) string {
+	nodes := SHARDS[shardid]
+	return nodes[0]
+}
+
+// Forward the request to specified address
+func forwardRequest(c echo.Context, address string) error {
+	// Store HTTP method type (GET, PUT, DELETE)
+	httpMethod := c.Request().Method
+	// Store key
+	key := c.Param("key")
+
+	// Read the body of the incoming request
+	body, err := io.ReadAll(c.Request().Body)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "Failed to read request body")
+	}
+	// Create a new request to forward the Main Instance
+	url := fmt.Sprintf("http://%s/kvs/%s", address, key)
+	req, err := http.NewRequest(httpMethod, url, bytes.NewReader(body))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to create forwarding request")
+	}
+	// Send the request to Main Instance using an http.Client
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "Cannot forward request"})
+	}
+	defer resp.Body.Close()
+	// Forward the response from the Main Instance back to the Client
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to read response body from target service")
+	}
+	// Send the response back to the client
+	return c.Blob(resp.StatusCode, "application/json", respBody)
+
 }

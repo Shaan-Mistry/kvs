@@ -13,6 +13,7 @@ require (
 
 require (
 	github.com/DistributedClocks/GoVector v0.0.0-20240117185643-ae07272d0ebd
+	github.com/labstack/echo v3.3.10+incompatible
 	github.com/labstack/gommon v0.4.2 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
