@@ -134,6 +134,27 @@ func compareReplicasVC(senderVC, recieverVC vclock.VClock, senderPos string) boo
 	return true
 }
 
+// Given a shard count and a list of nodes,
+// distribute the nodes in the current view into shards
+func distributeNodesIntoShards(shardCount int, nodes []string) {
+	// Delegate all nodes in current view to SHARDS map
+	nodesPerShard := len(nodes) / shardCount
+	remainder := len(nodes) % shardCount
+	// Create shardCount shardids in the SHARDS map
+	for i := 0; i < shardCount; i++ {
+		shardid := fmt.Sprintf("shard%d", i)
+		// Assign len(nodes)/SHARD_COUNT nodes to each shard
+		for j := 0; j < nodesPerShard; j++ {
+			SHARDS[shardid] = append(SHARDS[shardid], nodes[nodesPerShard*i+j])
+		}
+	}
+	// Distribute the remainder nodes to the first few shards
+	for i := 0; i < remainder; i++ {
+		shardid := fmt.Sprintf("shard%d", i)
+		SHARDS[shardid] = append(SHARDS[shardid], nodes[nodesPerShard*shardCount+i])
+	}
+}
+
 func syncMyself(shardCount int) {
 	// Look for a node to sync with
 	for _, address := range CURRENT_VIEW {
@@ -152,23 +173,8 @@ func syncMyself(shardCount int) {
 	for _, address := range CURRENT_VIEW {
 		MY_VECTOR_CLOCK.Set(address, 0)
 	}
-
-	// Delegate all nodes in current view to SHARDS map
-	nodesPerShard := len(CURRENT_VIEW) / shardCount
-	remainder := len(CURRENT_VIEW) % shardCount
-	// Create SHARD_COUNT shardids in the SHARDS map
-	for i := 0; i < shardCount; i++ {
-		shardid := fmt.Sprintf("shard%d", i)
-		// Assign len(CURRENT_VIEW)/SHARD_COUNT nodes to each shard
-		for j := 0; j < nodesPerShard; j++ {
-			SHARDS[shardid] = append(SHARDS[shardid], CURRENT_VIEW[nodesPerShard*i+j])
-		}
-	}
-	// Distribute the remainder nodes to the first few shards
-	for i := 0; i < remainder; i++ {
-		shardid := fmt.Sprintf("shard%d", i)
-		SHARDS[shardid] = append(SHARDS[shardid], CURRENT_VIEW[nodesPerShard*shardCount+i])
-	}
+	// Distribute all nodes into shards
+	distributeNodesIntoShards(shardCount, CURRENT_VIEW)
 }
 
 // Makes a request to existing replica to get the current view and vector clock
