@@ -33,6 +33,15 @@ func removeFromView(address string) {
 			break
 		}
 	}
+	// Remove from SHARDS
+	for shardid, nodes := range SHARDS {
+		for i, addr := range nodes {
+			if addr == address {
+				SHARDS[shardid] = append(nodes[:i], nodes[i+1:]...)
+				break
+			}
+		}
+	}
 }
 
 // Periodically check if a replica is still alive

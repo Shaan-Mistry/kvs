@@ -102,16 +102,14 @@ func main() {
 		LogMethod: true,
 		BeforeNextFunc: func(c echo.Context) {
 			c.Set("vclock", MY_VECTOR_CLOCK.ReturnVCString())
-			c.Set("table", KVStore)
 		},
 		LogValuesFunc: func(c echo.Context, v middleware.RequestLoggerValues) error {
-			kvs := c.Get("table")
 			//vclock, _ := c.Get("vclock").(string)
 			method := strings.ToUpper(v.Method)
-			// if method == "GET" && v.URI == "/view" {
-			// 	return nil
-			// }
-			fmt.Printf("%s %v status: %v kvs: %v", method, v.URI, v.Status, kvs)
+			if method == "GET" && v.URI == "/view" {
+				return nil
+			}
+			fmt.Printf("%s %v status: %v kvs: %v, shardMap: %v", method, v.URI, v.Status, KVStore, SHARDS)
 			println()
 			return nil
 		},
