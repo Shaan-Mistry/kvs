@@ -244,6 +244,7 @@ func updateMyShardID() {
 
 // Chose a random node from the inputted shardid
 func choseNodeFromShard(shardid string) string {
+	// Add loop thing if its works then break or whatever
 	nodes := SHARDS[shardid]
 	return nodes[0]
 }
