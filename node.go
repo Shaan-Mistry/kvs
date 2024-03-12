@@ -86,6 +86,7 @@ func main() {
 	e := echo.New()
 	// Attempt to sync replica with another replica in the system
 	syncMyself(SHARD_COUNT)
+	fmt.Printf("Shard Map: %v\n", SHARDS)
 	// Define Logger to display requests. Code from Echo Documentation
 	e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
 		LogStatus: true,
