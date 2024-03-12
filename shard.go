@@ -20,6 +20,10 @@ func (m myMember) String() string {
 	return string(m)
 }
 
+
+// Define the consitent hashing algorithm/functions
+// Taken from consistent.go documentation
+// https://pkg.go.dev/github.com/buraksezer/consistent#section-readme
 // Define hash function to be used by the consistent hashing algorithm
 type hasher struct{}
 
