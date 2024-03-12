@@ -9,7 +9,7 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-// Define Valid JSON formats for KVS Requets
+// Define JSON body for kvs PUT requests
 type KVS_PUT_Request struct {
 	Data           interface{} `json:"value"`
 	Type           string      `json:"type"`
@@ -17,12 +17,14 @@ type KVS_PUT_Request struct {
 	FromRepilca    string      `json:"from-replica,omitempty"`
 }
 
+// Define JSON body for kvs GET and DELETE requests
 type KVS_GET_DELETE_Request struct {
 	CausalMetaData string `json:"causal-metadata"`
 	FromRepilca    string `json:"from-replica,omitempty"`
 }
 
 // PUT /kvs/<key>
+// Add a key-value to the database
 func putKey(c echo.Context) error {
 	key := c.Param("key")
 
@@ -106,6 +108,7 @@ func putKey(c echo.Context) error {
 }
 
 // GET /kvs/<key>
+// Return the value of the indicated key
 func getKey(c echo.Context) error {
 	key := c.Param("key")
 
@@ -154,6 +157,7 @@ func getKey(c echo.Context) error {
 }
 
 // DELETE /kvs/<key>
+// Delete the indicateed key from the database
 func deleteKey(c echo.Context) error {
 	key := c.Param("key")
 

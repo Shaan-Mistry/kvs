@@ -15,6 +15,7 @@ type View_Request struct {
 }
 
 // PUT /view
+// Adds a new replica to this nodes current view
 func putReplicaView(c echo.Context) error {
 	body, err := io.ReadAll(c.Request().Body)
 	if err != nil {
@@ -35,11 +36,13 @@ func putReplicaView(c echo.Context) error {
 }
 
 // GET /view
+// Returns this nodes current view
 func getView(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string][]string{"view": CURRENT_VIEW})
 }
 
 // DELETE /view
+// Deletes a node from this node's current view
 func deleteReplicaView(c echo.Context) error {
 	body, err := io.ReadAll(c.Request().Body)
 	if err != nil {
