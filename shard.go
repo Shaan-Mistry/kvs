@@ -4,11 +4,26 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v4"
+	"github.com/serialx/hashring"
 )
 
-// How to organize Shards?
-// Hash table? ex: {shard-id: [node1, node2]}
-// Other requirements:
+// Define SHARDS to store nodes to respective shard ids
+var SHARDS = make(map[string][]string)
+
+// Define hash ring to represent the distribution of shards
+var HASH_RING *hashring.HashRing
+
+// Creates a new hash ring
+func createHashRing() *hashring.HashRing {
+	keys := make([]string, 0, len(SHARDS))
+	for key := range SHARDS {
+		keys = append(keys, key)
+	}
+	return hashring.New(keys)
+}
+
+
+
 // Each shard must contain at least two nodes to provide fault tolerance
 // Make sure that node sarrive to same sharding independentalty or through communication
 
@@ -19,6 +34,7 @@ import (
 // GET /shard/ids
 // Returns list of all shard indentifiers
 func getAllShardIds(c echo.Context) error {
+
 	return c.JSON(http.StatusOK, map[string][]string{"view": CURRENT_VIEW})
 }
 
