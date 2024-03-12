@@ -96,5 +96,13 @@ func addNodeToShard(c echo.Context) error {
 // JSON body {"shard-count": <INTEGER>}
 // Trigger a reshard into <INTEGER> shards
 func reshard(c echo.Context) error {
+
+
+	
+
+
+
 	return c.JSON(http.StatusOK, map[string]string{"result": "resharded"})
 }
+
+

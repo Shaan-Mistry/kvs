@@ -26,7 +26,15 @@ type KVS_GET_DELETE_Request struct {
 // PUT /kvs/<key>
 // Add a key-value to the database
 func putKey(c echo.Context) error {
+	// Check which shard the key belongs to
 	key := c.Param("key")
+	keyByte := []byte(key)
+	shardid := HASH_RING.LocateKey(keyByte).String()
+
+	// If shardid is NOT the same as MY_SHARD_ID, then forward the request to the appropriate shard
+	if shardid != MY_SHARD_ID {
+		return forwardRequest(c, choseNodeFromShard(shardid))
+	}
 
 	// Read JSON from request body
 	body, err := io.ReadAll(c.Request().Body)
@@ -167,7 +175,15 @@ func getKey(c echo.Context) error {
 // DELETE /kvs/<key>
 // Delete the indicateed key from the database
 func deleteKey(c echo.Context) error {
+	// Check which shard the key belongs to
 	key := c.Param("key")
+	keyByte := []byte(key)
+	shardid := HASH_RING.LocateKey(keyByte).String()
+
+	// If shardid is NOT the same as MY_SHARD_ID, then forward the request to the appropriate shard
+	if shardid != MY_SHARD_ID {
+		return forwardRequest(c, choseNodeFromShard(shardid))
+	}
 
 	// Read JSON from request body
 	body, err := io.ReadAll(c.Request().Body)
