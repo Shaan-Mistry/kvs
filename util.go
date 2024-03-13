@@ -66,7 +66,7 @@ func heartbeat() {
 				// broadcast delete views
 				payload := map[string]string{"socket-address": address}
 				jsonPayload, _ := json.Marshal(payload)
-				broadcast("DELETE", "view", jsonPayload)
+				broadcast("DELETE", "view", jsonPayload, CURRENT_VIEW)
 			}
 		}
 	}
@@ -92,9 +92,9 @@ func send(request *http.Request) {
 }
 
 // Broadcast a Request to all other replicas in the system asyncronously
-func broadcast(method string, endpoint string, jsonData []byte) error {
+func broadcast(method string, endpoint string, jsonData []byte, nodes []string) error {
 	// Broadcast request to all replicas
-	for _, address := range CURRENT_VIEW {
+	for _, address := range nodes {
 		// Dont broacast to youself
 		if address == SOCKET_ADDRESS {
 			continue
@@ -237,12 +237,12 @@ func syncWithNode(targetReplicaAddress string) error {
 
 // Stores which shard the current node belongs to into MY_SHARD_ID
 func updateMyShardID() {
-	// Locate the shard that contains the key
-	// Look through all shards  in SHARDS values and find SOCKET_ADDRESS
+	// Look through all shardids in SHARDS values and find to find my SOCKET_ADDRESS
 	for shardid, nodes := range SHARDS {
 		for _, address := range nodes {
 			if address == SOCKET_ADDRESS {
 				MY_SHARD_ID = shardid
+				return
 			}
 		}
 	}

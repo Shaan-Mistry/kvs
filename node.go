@@ -97,9 +97,11 @@ func main() {
 	HASH_RING = createHashRing()
 	// Define Logger to display requests. Code from Echo Documentation
 	e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
-		LogStatus: true,
-		LogURI:    true,
-		LogMethod: true,
+		LogStatus:    true,
+		LogURI:       true,
+		LogMethod:    true,
+		LogUserAgent: true,
+		LogRemoteIP:  true,
 		BeforeNextFunc: func(c echo.Context) {
 			c.Set("vclock", MY_VECTOR_CLOCK.ReturnVCString())
 		},
@@ -109,7 +111,7 @@ func main() {
 			if method == "GET" && v.URI == "/view" {
 				return nil
 			}
-			fmt.Printf("%s %v status: %v kvs: %v, shardMap: %v", method, v.URI, v.Status, KVStore, SHARDS)
+			fmt.Printf("%v %s %v status: %v kvs: %v, shardMap: %v", v.RemoteIP, v.Method, v.URI, v.Status, KVStore, SHARDS)
 			println()
 			return nil
 		},
@@ -143,7 +145,7 @@ func main() {
 	jsonPayload, _ := json.Marshal(payload)
 	// Broadcaset Put View message to all replicas in the system
 	println("------------ Broadcasting Myself! ------------")
-	broadcast("PUT", "view", jsonPayload)
+	broadcast("PUT", "view", jsonPayload, CURRENT_VIEW)
 	// Start heartbeat checker
 	go heartbeat()
 	// Start Echo server

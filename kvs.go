@@ -99,7 +99,7 @@ func putKey(c echo.Context) error {
 		input.FromRepilca = SOCKET_ADDRESS
 		input.CausalMetaData = MY_VECTOR_CLOCK.ReturnVCString()
 		jsonData, _ := json.Marshal(input)
-		go broadcast("PUT", "kvs/"+key, jsonData)
+		go broadcast("PUT", "kvs/"+key, jsonData, SHARDS[MY_SHARD_ID])
 	}
 
 	// Check if the key existed before the update
@@ -238,7 +238,7 @@ func deleteKey(c echo.Context) error {
 		input.FromRepilca = SOCKET_ADDRESS
 		input.CausalMetaData = MY_VECTOR_CLOCK.ReturnVCString()
 		jsonData, _ := json.Marshal(input)
-		go broadcast("PUT", "kvs/"+key, jsonData)
+		go broadcast("PUT", "kvs/"+key, jsonData, SHARDS[MY_SHARD_ID])
 	}
 
 	// Check if key exists
