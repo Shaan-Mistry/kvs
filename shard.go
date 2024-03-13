@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 
@@ -107,7 +108,9 @@ type Reshard_Request struct {
 // and we have to move a minimal amount of nodes from shards
 
 func reshard(c echo.Context) error {
-
+	fmt.Printf("\nResharding\n")
+	fmt.Printf("\nCurrent View: %v\n", CURRENT_VIEW)
+	fmt.Printf("\nCurrent Shards: %v\n", SHARDS)
 	// Read JSON from request body
 	body, err := io.ReadAll(c.Request().Body)
 
@@ -152,14 +155,16 @@ func reshard(c echo.Context) error {
 		// Add new shards to SHARDS
 		numShardsToAdd := targetNumShards - currNumShards
 		for i := 0; i < numShardsToAdd; i++ {
-			shardid := "shard" + string(i+currNumShards)
+			shardid := fmt.Sprintf("shard%d", i+currNumShards)
 			SHARDS[shardid] = []string{}
 			// Add a free node to each new shard
 			SHARDS[shardid] = append(SHARDS[shardid], availableNodes[0])
 			availableNodes = availableNodes[1:]
 		}
-
 		// Update the key-value store in the new shards
+
+		fmt.Printf("\nSHARDS before distribution\n")
+		fmt.Printf("\n%v\n", SHARDS)
 
 		// Evenly distribute rest of the nodes back to the shards
 		distributeNodesIntoShards(targetNumShards, availableNodes)
@@ -171,6 +176,10 @@ func reshard(c echo.Context) error {
 	//oldRing := HASH_RING
 	// Update the hash ring
 	//HASH_RING = createHashRing()
+
+	fmt.Printf("\nFinished Resharding\n")
+	fmt.Printf("\nCurrent View: %v\n", CURRENT_VIEW)
+	fmt.Printf("\nCurrent Shards: %v\n", SHARDS)
 
 	return c.JSON(http.StatusOK, map[string]string{"result": "resharded"})
 }

@@ -107,8 +107,8 @@ func main() {
 		},
 		LogValuesFunc: func(c echo.Context, v middleware.RequestLoggerValues) error {
 			//vclock, _ := c.Get("vclock").(string)
-			method := strings.ToUpper(v.Method)
-			if method == "GET" && v.URI == "/view" {
+			//method := strings.ToUpper(v.Method)
+			if v.URI == "/view" {
 				return nil
 			}
 			fmt.Printf("%v %s %v status: %v kvs: %v, shardMap: %v", v.RemoteIP, v.Method, v.URI, v.Status, KVStore, SHARDS)
@@ -137,14 +137,13 @@ func main() {
 	e.GET("/shard/node-shard-id", nil)
 	e.GET("/shard/members/:id", nil)
 	e.PUT("/shard/add-member/:id", nil)
-	e.PUT("shard/reshard", nil)
+	e.PUT("shard/reshard", reshard)
 	// Define /sync endpoint for syncing new nodes
 	e.GET("/sync", syncHandler)
 	// Build the JSON body to be sent: {"socket-address":"<IP:PORT>"}
 	payload := map[string]string{"socket-address": SOCKET_ADDRESS}
 	jsonPayload, _ := json.Marshal(payload)
 	// Broadcaset Put View message to all replicas in the system
-	println("------------ Broadcasting Myself! ------------")
 	broadcast("PUT", "view", jsonPayload, CURRENT_VIEW)
 	// Start heartbeat checker
 	go heartbeat()
