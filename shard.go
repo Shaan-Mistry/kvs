@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -95,18 +96,31 @@ type Reshard_Request struct {
 	ShardCount int `json:"shard-count"`
 }
 
+// Define private endpoint for updating kvs for resharding
+// PUT /shard/kvs-update/<key>
+func updateKvsForResharding(c echo.Context) error {
+	// Store key value
+	key := c.Param("key")
+	// Read JSON from request body
+	body, err := io.ReadAll(c.Request().Body)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Failed to read request body"})
+	}
+	// Unmarshal JSON
+	var input KVS_PUT_Request
+	jsonErr := json.Unmarshal(body, &input)
+	if jsonErr != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid JSON format"})
+	}
+	// Update or create key-value mapping
+	KVStore[key] = Value{input.Data, input.Type}
+	// Return success
+	return c.JSON(http.StatusOK, map[string]string{"result": "updated"})
+}
+
 // PUT /shard/reshard
 // JSON body {"shard-count": <INTEGER>}
 // Trigger a reshard into <INTEGER> shards
-
-// When to reshard?
-// When a shard contains one node due to the failure of other nodes
-// When adding new nodes to the system
-
-// Distribute the shards to the nodes
-// Calculate the optimal distribution of shards to nodes so that each shard has at least two nodes
-// and we have to move a minimal amount of nodes from shards
-
 func reshard(c echo.Context) error {
 	fmt.Printf("\nResharding\n")
 	fmt.Printf("\nCurrent View: %v\n", CURRENT_VIEW)
@@ -151,7 +165,6 @@ func reshard(c echo.Context) error {
 				availableNodes = append(availableNodes, removedNodes...)
 			}
 		}
-
 		// Add new shards to SHARDS
 		numShardsToAdd := targetNumShards - currNumShards
 		for i := 0; i < numShardsToAdd; i++ {
@@ -161,7 +174,30 @@ func reshard(c echo.Context) error {
 			SHARDS[shardid] = append(SHARDS[shardid], availableNodes[0])
 			availableNodes = availableNodes[1:]
 		}
-		// Update the key-value store in the new shards
+
+		// Update the key-value based on the new shard partitions
+		// Go through each key and see if it needs to be moved to a different shard
+		for key, value := range KVStore {
+			// Check if the key belongs to the shard
+			keyByte := []byte(key)
+			shardid := HASH_RING.LocateKey(keyByte).String()
+			// If the key does not belong to the shard, forward a Private PUT request to the appropriate shard
+			if shardid != MY_SHARD_ID {
+				// Build http method to send
+				// Create the url using the current address
+				url := fmt.Sprintf("http://%s/%s", choseNodeFromShard(shardid), "shard/kvs-update/"+key)
+				// Create the JSON body to send
+				payload := map[string]string{"key": key, "value": value.Data.(string), "type": value.Type, "causal-metadata": ""}
+
+				jsonPayload, _ := json.Marshal(payload)
+				// Build the http request
+				request, _ := http.NewRequest("PUT", url, bytes.NewBuffer(jsonPayload))
+				// Forward the request to the appropriate shard
+				send(request)
+			}
+
+		}
+		// Delete the key from the shard
 
 		fmt.Printf("\nSHARDS before distribution\n")
 		fmt.Printf("\n%v\n", SHARDS)
@@ -171,11 +207,12 @@ func reshard(c echo.Context) error {
 
 		// Sync the nodes within their shards
 
-	}
+		// broadcast reshard to all nodes
 
-	//oldRing := HASH_RING
-	// Update the hash ring
-	//HASH_RING = createHashRing()
+		//oldRing := HASH_RING
+		// Update the hash ring
+		//HASH_RING = createHashRing()
+	}
 
 	fmt.Printf("\nFinished Resharding\n")
 	fmt.Printf("\nCurrent View: %v\n", CURRENT_VIEW)

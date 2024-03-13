@@ -108,7 +108,7 @@ func main() {
 		LogValuesFunc: func(c echo.Context, v middleware.RequestLoggerValues) error {
 			//vclock, _ := c.Get("vclock").(string)
 			//method := strings.ToUpper(v.Method)
-			if v.URI == "/view" {
+			if v.URI == "/view" || v.URI == "/sync" {
 				return nil
 			}
 			fmt.Printf("%v %s %v status: %v kvs: %v, shardMap: %v", v.RemoteIP, v.Method, v.URI, v.Status, KVStore, SHARDS)
@@ -138,6 +138,7 @@ func main() {
 	e.GET("/shard/members/:id", nil)
 	e.PUT("/shard/add-member/:id", nil)
 	e.PUT("shard/reshard", reshard)
+	e.PUT("shard/kvs-update/:key", updateKvsForResharding)
 	// Define /sync endpoint for syncing new nodes
 	e.GET("/sync", syncHandler)
 	// Build the JSON body to be sent: {"socket-address":"<IP:PORT>"}

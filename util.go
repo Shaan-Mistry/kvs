@@ -83,7 +83,6 @@ func send(request *http.Request) {
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode != 503 {
-			//println("[BROAD]", method, url)
 			return
 		}
 		// Sleep for 1 second and then try again
@@ -289,3 +288,4 @@ func forwardRequest(c echo.Context, address string) error {
 	return c.Blob(resp.StatusCode, "application/json", respBody)
 
 }
+
