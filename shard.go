@@ -157,6 +157,7 @@ func reshard(c echo.Context) error {
 		for _, key := range strings.Split(input.NewShards, ",") {
 			HASH_RING.Add(myMember(key))
 		}
+		fmt.Printf("\nMy ShardID: %s\n", MY_SHARD_ID)
 		return c.JSON(http.StatusOK, map[string]string{"result": "resharded"})
 	}
 
