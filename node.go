@@ -131,10 +131,11 @@ func main() {
 	e.GET("/view", getView)
 	e.DELETE("/view", deleteReplicaView)
 	// Define /shard endpoints
-	e.GET("/shard/ids", nil)
-	e.GET("/shard/node-shard-id", nil)
-	e.GET("/shard/members/:id", nil)
-	e.PUT("/shard/add-member/:id", nil)
+	e.GET("/shard/ids", getAllShardIds)
+	e.GET("/shard/node-shard-id", getMyShardId)
+	e.GET("/shard/members/:id", getMembersOfShard)
+	e.GET("/shard/key-count/:id", getShardKeyCount)
+	e.PUT("/shard/add-member/:id", addNodeToShard)
 	e.PUT("shard/reshard", reshard)
 	e.PUT("shard/kvs-update/:key", updateKvsForResharding)
 	// Define /sync endpoint for syncing new nodes

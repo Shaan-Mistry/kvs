@@ -70,19 +70,15 @@ func getAllShardIds(c echo.Context) error {
 // GET /shard/node-shard-id
 // Returns the shard identifier of this node
 func getMyShardId(c echo.Context) error {
-	for shardID, nodes := range SHARDS {
-		for _, node := range nodes {
-			if node == SOCKET_ADDRESS {
-				return c.JSON(http.StatusOK, map[string]string{"node-shard-id": shardID})
-			}
-		}
+	if MY_SHARD_ID == "" {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Unable to determine shard ID for the current node"})
 	}
-	return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Unable to determine shard ID for the current node"})
+	return c.JSON(http.StatusOK, map[string]string{"node-shard-id": MY_SHARD_ID})
 }
 
 // GET /shard/members/<ID>
 // Returns the members of the indicated shard
-func getNodeShardID(c echo.Context) error {
+func getMembersOfShard(c echo.Context) error {
 	// Extracting the shard ID from the request URL parameter
 	shardID := c.Param("id")
 
@@ -97,7 +93,7 @@ func getNodeShardID(c echo.Context) error {
 
 // GET /shard/key-count/<ID>
 // Returns the number of key-value pairs stored by the indicated shard
-func getNumKvPairsInShard(c echo.Context) error {
+func getShardKeyCount(c echo.Context) error {
 
 	// Send request to node in indicated shard
 

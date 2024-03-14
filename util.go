@@ -245,6 +245,7 @@ func updateMyShardID() {
 			}
 		}
 	}
+	MY_SHARD_ID = ""
 }
 
 // Chose a random node from the inputted shardid
@@ -288,4 +289,3 @@ func forwardRequest(c echo.Context, address string) error {
 	return c.Blob(resp.StatusCode, "application/json", respBody)
 
 }
-
