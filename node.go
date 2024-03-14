@@ -83,17 +83,19 @@ func main() {
 	// Read environment variables
 	SOCKET_ADDRESS = os.Getenv("SOCKET_ADDRESS")
 	CURRENT_VIEW = strings.Split(os.Getenv("VIEW"), ",")
-	SHARD_COUNT, _ := strconv.Atoi(os.Getenv("SHARD_COUNT"))
-
+	SHARD_COUNT, err := strconv.Atoi(os.Getenv("SHARD_COUNT"))
+	// Check if SHARD_COUNT was specified
+	if err == nil {
+		syncMyself(SHARD_COUNT)
+		// Store my shard id
+		updateMyShardID()
+		// Create a hash ring to represent the distribution of shards
+		HASH_RING = createHashRing()
+	}
 	// Define new Echo instance
 	e := echo.New()
-	// Attempt to sync replica with another replica in the system
-	syncMyself(SHARD_COUNT)
-	// Store my shard id
-	updateMyShardID()
 	fmt.Printf("\nMy ShardID: %s\n", MY_SHARD_ID)
-	// Create a hash ring to represent the distribution of shards
-	HASH_RING = createHashRing()
+
 	// Define Logger to display requests. Code from Echo Documentation
 	e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
 		LogStatus:    true,
@@ -110,7 +112,7 @@ func main() {
 			if v.URI == "/view" || v.URI == "/sync" {
 				return nil
 			}
-			fmt.Printf("%v %s %v status: %v kvs: %v\n shardMap: %v\n\n", v.RemoteIP, v.Method, v.URI, v.Status, KVStore, SHARDS)
+			fmt.Printf("%v %s %v status: %v kvs: %v\n MyShard %s, shardMap: %v\n\n", v.RemoteIP, v.Method, v.URI, v.Status, KVStore, MY_SHARD_ID, SHARDS)
 			return nil
 		},
 	}))

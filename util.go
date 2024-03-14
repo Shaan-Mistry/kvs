@@ -136,6 +136,8 @@ func compareReplicasVC(senderVC, recieverVC vclock.VClock, senderPos string) boo
 // Given a shard count and a list of nodes,
 // distribute the nodes in the current view into shards
 func distributeNodesIntoShards(shardCount int, nodes []string) {
+	// Clear the SHARDS map
+	SHARDS = make(map[string][]string)
 	// Delegate all nodes in current view to SHARDS map
 	nodesPerShard := len(nodes) / shardCount
 	remainder := len(nodes) % shardCount
@@ -155,6 +157,10 @@ func distributeNodesIntoShards(shardCount int, nodes []string) {
 }
 
 func syncMyself(shardCount int) {
+
+	// Distribute all nodes into shards
+	distributeNodesIntoShards(shardCount, CURRENT_VIEW)
+
 	// Look for a node to sync with
 	for _, address := range CURRENT_VIEW {
 		// Dont sync with yourself
@@ -172,8 +178,7 @@ func syncMyself(shardCount int) {
 	for _, address := range CURRENT_VIEW {
 		MY_VECTOR_CLOCK.Set(address, 0)
 	}
-	// Distribute all nodes into shards
-	distributeNodesIntoShards(shardCount, CURRENT_VIEW)
+
 }
 
 // Makes a request to existing replica to get the current view and vector clock

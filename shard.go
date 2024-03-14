@@ -1,12 +1,11 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
+	"sync"
 
 	"github.com/buraksezer/consistent"
 	"github.com/cespare/xxhash"
@@ -18,6 +17,9 @@ var SHARDS = make(map[string][]string)
 
 // Define hash ring to represent the distribution of shards
 var HASH_RING *consistent.Consistent
+
+// Define a lock to protext concurrent access to KVStore
+var KVSmutex = &sync.Mutex{}
 
 type myMember string
 
@@ -163,28 +165,26 @@ func updateKvsForResharding(c echo.Context) error {
 	if jsonErr != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid JSON format"})
 	}
+	// Lock before accessing the KVStore
+	KVSmutex.Lock()
 	// Update or create key-value mapping
 	KVStore[key] = Value{input.Data, input.Type}
+	// Unlock after accessing the KVStore
+	KVSmutex.Unlock()
 	// Return success
 	return c.JSON(http.StatusOK, map[string]string{"result": "updated"})
 }
 
 // Define JSON body for kvs GET and DELETE requests
 type Reshard_Request struct {
-	ShardCount   int    `json:"shard-count"`
-	FromRepilca  string `json:"from-replica,omitempty"`
-	ShardsString string `json:"shard-string,omitempty"`
-	NewShards    string `json:"new-shards,omitempty"`
+	ShardCount  int    `json:"shard-count"`
+	FromRepilca string `json:"from-replica,omitempty"`
 }
 
 // PUT /shard/reshard
 // JSON body {"shard-count": <INTEGER>}
 // Trigger a reshard into <INTEGER> shards
 func reshard(c echo.Context) error {
-	// fmt.Printf("\nResharding\n")
-	// fmt.Printf("\nCurrent View: %v\n", CURRENT_VIEW)
-	// fmt.Printf("\nCurrent Shards: %v\n", SHARDS)
-	// Read JSON from request body
 	body, err := io.ReadAll(c.Request().Body)
 
 	if err != nil {
@@ -197,111 +197,45 @@ func reshard(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid JSON format"})
 	}
 
-	// If the request is from another replica, then the reshard has already been performed
-	// We just need to update
-	if input.FromRepilca != "" {
-		// Parse the Shard string
-		var newShardMap map[string][]string
-		err = json.Unmarshal([]byte(input.ShardsString), &newShardMap)
-		if err != nil {
-			return fmt.Errorf("error creating shards from string: %v", err)
-		}
-		// Update SHARDS with the new shards
-		SHARDS = newShardMap
-		// Add new shards to the hash ring
-		for _, key := range strings.Split(input.NewShards, ",") {
-			HASH_RING.Add(myMember(key))
-		}
-		fmt.Printf("\nMy ShardID: %s\n", MY_SHARD_ID)
-		return c.JSON(http.StatusOK, map[string]string{"result": "resharded"})
-	}
-
 	numNodes := len(CURRENT_VIEW)
 	currNumShards := len(HASH_RING.GetMembers())
 	targetNumShards := input.ShardCount
 
-	// If we want to reduce the number of shards
-	if targetNumShards < currNumShards {
-		//numShardsToRemove := currNumShards - targetNumShards
-		// Iteratively delete diff number of shards and distribute their nodes to other shards
-
-		// If we want to increase the number of shards
-	} else if targetNumShards > currNumShards {
+	if targetNumShards > currNumShards && numNodes/targetNumShards < 2 {
 		// Check if there are enough nodes to provide fault tolerance with the requested shard count
-		if numNodes/targetNumShards < 2 {
-			return c.JSON(http.StatusBadRequest, map[string]string{"error": "Not enough nodes to provide fault tolerance with requested shard count"})
-		}
-		// Remove all nodes except 1 from each shard
-		// Keep a list of nodes removed
-		availableNodes := []string{}
-		for shardid, nodes := range SHARDS {
-			if len(nodes) > 1 {
-				// Remove all nodes except 1 from the shard
-				removedNodes := nodes[1:]
-				SHARDS[shardid] = nodes[:1]
-				// Add removed nodes to availableNodes
-				availableNodes = append(availableNodes, removedNodes...)
-			}
-		}
-		// Add new shards to SHARDS
-		numShardsToAdd := targetNumShards - currNumShards
-		newShards := ""
-		for i := 0; i < numShardsToAdd; i++ {
-			shardid := fmt.Sprintf("shard%d", i+currNumShards)
-			newShards += shardid + ","
-			SHARDS[shardid] = []string{}
-			// Add a free node to each new shard
-			SHARDS[shardid] = append(SHARDS[shardid], availableNodes[0])
-			availableNodes = availableNodes[1:]
-			// Add the new shard to the hash ring
-			HASH_RING.Add(myMember(shardid))
-		}
-		// Update the key-value based on the new shard partitions
-		// Go through each key and see if it needs to be moved to a different shard
-		for key, value := range KVStore {
-			// Check if the key belongs to the shard
-			keyByte := []byte(key)
-			shardid := HASH_RING.LocateKey(keyByte).String()
-			// If the key does not belong to the shard, forward a Private PUT request to the appropriate shard
-			if shardid != MY_SHARD_ID {
-				// Build http method to send
-				// Create the url using the current address
-				url := fmt.Sprintf("http://%s/%s", choseNodeFromShard(shardid), "shard/kvs-update/"+key)
-				payload := map[string]interface{}{"value": value.Data, "type": value.Type, "causal-metadata": "", "from-replica": SOCKET_ADDRESS}
-				jsonBytes, _ := json.Marshal(payload)
-				fmt.Println(string(jsonBytes))
-				// Build the http request
-				request, _ := http.NewRequest("PUT", url, bytes.NewBuffer(jsonBytes))
-				// Forward the request to the appropriate shard
-				fmt.Printf("\nForwarding request to %s\n", choseNodeFromShard(shardid))
-				send(request)
-				// Delete the shard from my KVStore
-				delete(KVStore, key)
-			}
-
-		}
-		// Evenly distribute rest of the nodes back to the shards
-		distributeNodesIntoShards(targetNumShards, availableNodes)
-
-		// broadcast reshard to all nodes
-
-		// Convert Shards to JSON bytes
-		jsonBytes, err := json.Marshal(SHARDS)
-		if err != nil {
-			return c.JSON(http.StatusInternalServerError, "Failed to convert Shard Map to string")
-		}
-		// Convert Shards to string
-		shardsString := string(jsonBytes)
-		// Create JSON payload to be sent to other nodes
-		payload := map[string]interface{}{"shard-count": targetNumShards, "from-replica": SOCKET_ADDRESS, "shard-string": shardsString, "new-shards": ""}
-		jsonBytes, err = json.Marshal(payload)
-		if err != nil {
-			return c.JSON(http.StatusInternalServerError, "Failed to convert JSON payload to string")
-		}
-		broadcast("PUT", "shard/reshard", jsonBytes, CURRENT_VIEW)
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Not enough nodes to provide fault tolerance with requested shard count"})
 	}
+	// Distribute nodes into shards
+	distributeNodesIntoShards(targetNumShards, CURRENT_VIEW)
 	// Update my shard id in MY_SHARD_ID
 	updateMyShardID()
+	// Update Hash Ring
+	HASH_RING = createHashRing()
+	// Go through each key and see if it needs to be moved to a different shard
+	for key, value := range KVStore {
+		// Check if the key belongs to the shard
+		keyByte := []byte(key)
+		shardid := HASH_RING.LocateKey(keyByte).String()
+		// If the key does not belong to the shard, forward a Private PUT KVS request to the appropriate shard
+		if shardid != MY_SHARD_ID {
+			payload := map[string]interface{}{"value": value.Data, "type": value.Type, "causal-metadata": "", "from-replica": SOCKET_ADDRESS}
+			jsonBytes, _ := json.Marshal(payload)
+			// Forward the request to the appropriate shard
+			broadcast("PUT", "shard/kvs-update/"+key, jsonBytes, SHARDS[shardid])
+			// Delete the shard from my KVStore
+			// Lock before accessing the KVStore
+			KVSmutex.Lock()
+			delete(KVStore, key)
+			// Unlock after accessing the KVStore
+			KVSmutex.Unlock()
+		}
+	}
+	// If request is not from another node, broadcast reshard to all nodes
+	if input.FromRepilca == "" {
+		input.FromRepilca = SOCKET_ADDRESS
+		jsonBytes, _ := json.Marshal(input)
+		broadcast("PUT", "shard/reshard", jsonBytes, CURRENT_VIEW)
+	}
 
 	fmt.Printf("\nMy ShardID: %s\n", MY_SHARD_ID)
 
