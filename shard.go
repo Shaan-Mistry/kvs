@@ -244,10 +244,10 @@ func reshard(c echo.Context) error {
 		}
 		broadcast("PUT", "shard/reshard", jsonBytes, CURRENT_VIEW)
 	}
+	// Update my shard id in MY_SHARD_ID
+	updateMyShardID()
 
-	// fmt.Printf("\nFinished Resharding\n")
-	// fmt.Printf("\nCurrent View: %v\n", CURRENT_VIEW)
-	// fmt.Printf("\nCurrent Shards: %v\n", SHARDS)
+	fmt.Printf("\nMy ShardID: %s\n", MY_SHARD_ID)
 
 	return c.JSON(http.StatusOK, map[string]string{"result": "resharded"})
 }
