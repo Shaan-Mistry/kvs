@@ -60,20 +60,39 @@ func createHashRing() *consistent.Consistent {
 // GET /shard/ids
 // Returns list of all shard indentifiers
 func getAllShardIds(c echo.Context) error {
-
-	return c.JSON(http.StatusOK, map[string][]string{"view": CURRENT_VIEW})
+	shardIDs := make([]string, 0, len(SHARDS))
+	for shardID := range SHARDS {
+		shardIDs = append(shardIDs, shardID)
+	}
+	return c.JSON(http.StatusOK, map[string][]string{"shard-ids": shardIDs})
 }
 
 // GET /shard/node-shard-id
 // Returns the shard identifier of this node
 func getMyShardId(c echo.Context) error {
-	return c.JSON(http.StatusOK, map[string][]string{"view": CURRENT_VIEW})
+	for shardID, nodes := range SHARDS {
+		for _, node := range nodes {
+			if node == SOCKET_ADDRESS {
+				return c.JSON(http.StatusOK, map[string]string{"node-shard-id": shardID})
+			}
+		}
+	}
+	return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Unable to determine shard ID for the current node"})
 }
 
 // GET /shard/members/<ID>
 // Returns the members of the indicated shard
 func getNodeShardID(c echo.Context) error {
-	return c.JSON(http.StatusOK, map[string][]string{"view": CURRENT_VIEW})
+	// Extracting the shard ID from the request URL parameter
+	shardID := c.Param("id")
+
+	// Checking if the shard ID exists in the SHARDS map
+	if members, ok := SHARDS[shardID]; ok {
+		// If found, return the members of the shard
+		return c.JSON(http.StatusOK, map[string][]string{"shard-members": members})
+	}
+	// If the shard ID does not exist, return an error message
+	return c.JSON(http.StatusNotFound, map[string]string{"error": "Shard ID not found"})
 }
 
 // GET /shard/key-count/<ID>
@@ -89,7 +108,35 @@ func getNumKvPairsInShard(c echo.Context) error {
 // JSON body {"socket-address": <IP:PORT>}
 // Assign the node <IP:PORT> to the shard <ID>
 func addNodeToShard(c echo.Context) error {
-	return c.JSON(http.StatusOK, map[string][]string{"view": CURRENT_VIEW})
+	// Extract the shard ID from the URL parameter.
+	shardID := c.Param("id")
+
+	// Define a structure to parse the request body.
+	var requestBody struct {
+		SocketAddress string `json:"socket-address"`
+	}
+
+	// Bind the incoming JSON body to the requestBody structure.
+	if err := c.Bind(&requestBody); err != nil {
+		// If there's an error in parsing the request body, return a bad request response.
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+	}
+
+	// Check if the shard exists.
+	if _, exists := SHARDS[shardID]; !exists {
+		// If the shard doesn't exist, return a not found response.
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "Shard ID not found"})
+	}
+
+	// Add the node to the shard.
+	// You might also want to check if the node already exists in the shard or in any other shard before adding.
+	SHARDS[shardID] = append(SHARDS[shardID], requestBody.SocketAddress)
+
+	// Optionally, you might want to update any distributed state or notify the system of the change.
+	// This could involve sending a message to the newly added node or to a central coordinator, depending on your architecture.
+
+	// Return a success response.
+	return c.JSON(http.StatusOK, map[string]string{"result": "Node added to shard"})
 }
 
 // Define private endpoint for updating kvs for resharding
