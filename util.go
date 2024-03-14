@@ -68,6 +68,9 @@ func heartbeat() {
 				jsonPayload, _ := json.Marshal(payload)
 				broadcast("DELETE", "view", jsonPayload, CURRENT_VIEW)
 			}
+			if resp != nil {
+				resp.Body.Close()
+			}
 		}
 	}
 }
@@ -108,7 +111,7 @@ func broadcast(method string, endpoint string, jsonData []byte, nodes []string) 
 		}
 		// Send request to current replica
 		go send(request)
-
+		time.Sleep(10 * time.Millisecond)
 	}
 	return nil
 }

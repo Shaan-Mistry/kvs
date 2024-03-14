@@ -112,7 +112,7 @@ func main() {
 			if v.URI == "/view" || v.URI == "/sync" {
 				return nil
 			}
-			fmt.Printf("%v %s %v status: %v kvs: %v\n MyShard %s, shardMap: %v\n\n", v.RemoteIP, v.Method, v.URI, v.Status, KVStore, MY_SHARD_ID, SHARDS)
+			fmt.Printf("%v %s %v status: %v shard: %s \nkvs: %v\n shardMap: %v\n\n", v.RemoteIP, v.Method, v.URI, v.Status, MY_SHARD_ID, KVStore, SHARDS)
 			return nil
 		},
 	}))

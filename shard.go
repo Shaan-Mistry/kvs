@@ -217,16 +217,15 @@ func reshard(c echo.Context) error {
 		// Check if the key belongs to the shard
 		keyByte := []byte(key)
 		shardid := HASH_RING.LocateKey(keyByte).String()
-		// If the key does not belong to the shard, forward a Private PUT KVS request to the appropriate shard
+		// Forward a private PUT KVS request to the appropriate shard
+		payload := map[string]interface{}{"value": value.Data, "type": value.Type, "causal-metadata": "", "from-replica": SOCKET_ADDRESS}
+		jsonBytes, _ := json.Marshal(payload)
+		// Forward the request to the appropriate shard
+		broadcast("PUT", "shard/kvs-update/"+key, jsonBytes, SHARDS[shardid])
+		// Delete the shard from my KVStore
 		if shardid != MY_SHARD_ID {
-			payload := map[string]interface{}{"value": value.Data, "type": value.Type, "causal-metadata": "", "from-replica": SOCKET_ADDRESS}
-			jsonBytes, _ := json.Marshal(payload)
-			// Forward the request to the appropriate shard
-			broadcast("PUT", "shard/kvs-update/"+key, jsonBytes, SHARDS[shardid])
-			// Delete the shard from my KVStore
-			// Lock before accessing the KVStore
 			delete(KVStore, key)
-			
+
 		}
 	}
 	// Unlock after accessing the KVStore
