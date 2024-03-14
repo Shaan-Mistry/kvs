@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"sync"
@@ -212,6 +211,8 @@ func reshard(c echo.Context) error {
 	// Update Hash Ring
 	HASH_RING = createHashRing()
 	// Go through each key and see if it needs to be moved to a different shard
+	// Lock before accessing the KVStore
+	KVSmutex.Lock()
 	for key, value := range KVStore {
 		// Check if the key belongs to the shard
 		keyByte := []byte(key)
@@ -224,20 +225,18 @@ func reshard(c echo.Context) error {
 			broadcast("PUT", "shard/kvs-update/"+key, jsonBytes, SHARDS[shardid])
 			// Delete the shard from my KVStore
 			// Lock before accessing the KVStore
-			KVSmutex.Lock()
 			delete(KVStore, key)
-			// Unlock after accessing the KVStore
-			KVSmutex.Unlock()
+			
 		}
 	}
+	// Unlock after accessing the KVStore
+	KVSmutex.Unlock()
 	// If request is not from another node, broadcast reshard to all nodes
 	if input.FromRepilca == "" {
 		input.FromRepilca = SOCKET_ADDRESS
 		jsonBytes, _ := json.Marshal(input)
 		broadcast("PUT", "shard/reshard", jsonBytes, CURRENT_VIEW)
 	}
-
-	fmt.Printf("\nMy ShardID: %s\n", MY_SHARD_ID)
-
+	// Return success
 	return c.JSON(http.StatusOK, map[string]string{"result": "resharded"})
 }

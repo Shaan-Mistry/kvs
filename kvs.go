@@ -106,7 +106,11 @@ func putKey(c echo.Context) error {
 	_, existed := KVStore[key]
 
 	// Update or create key-value mapping
+	// Lock before accessing the KVStore
+	KVSmutex.Lock()
 	KVStore[key] = Value{input.Data, input.Type}
+	// Unlock after accessing the KVStore
+	KVSmutex.Unlock()
 
 	// Return response with the appropriate status
 	if existed {
@@ -247,8 +251,12 @@ func deleteKey(c echo.Context) error {
 		return c.JSON(http.StatusNotFound, map[string]string{"error": "Key does not exist"})
 	}
 
+	// Lock before accessing the KVStore
+	KVSmutex.Lock()
 	// Delete key
 	delete(KVStore, key)
+	// Unlock after accessing the KVStore
+	KVSmutex.Unlock()
 
 	// Return response
 	return c.JSON(http.StatusOK, map[string]string{"result": "deleted", "causal-metadata": MY_VECTOR_CLOCK.ReturnVCString()})
