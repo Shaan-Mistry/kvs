@@ -100,6 +100,12 @@ func getShardKeyCount(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string][]string{"view": CURRENT_VIEW})
 }
 
+// Define a structure to parse the request body.
+type addNodeRequest struct {
+	SocketAddress string `json:"socket-address"`
+	FromRepilca   string `json:"from-replica,omitempty"`
+}
+
 // PUT /shard/add-member/<ID>
 // JSON body {"socket-address": <IP:PORT>}
 // Assign the node <IP:PORT> to the shard <ID>
@@ -107,30 +113,36 @@ func addNodeToShard(c echo.Context) error {
 	// Extract the shard ID from the URL parameter.
 	shardID := c.Param("id")
 
-	// Define a structure to parse the request body.
-	var requestBody struct {
-		SocketAddress string `json:"socket-address"`
+	// Read JSON from request body
+	body, err := io.ReadAll(c.Request().Body)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Failed to read request body"})
 	}
-
-	// Bind the incoming JSON body to the requestBody structure.
-	if err := c.Bind(&requestBody); err != nil {
-		// If there's an error in parsing the request body, return a bad request response.
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+	// Unmarshal JSON
+	var input addNodeRequest
+	jsonErr := json.Unmarshal(body, &input)
+	if jsonErr != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid JSON format"})
 	}
-
 	// Check if the shard exists.
 	if _, exists := SHARDS[shardID]; !exists {
 		// If the shard doesn't exist, return a not found response.
 		return c.JSON(http.StatusNotFound, map[string]string{"error": "Shard ID not found"})
 	}
-
 	// Add the node to the shard.
 	// You might also want to check if the node already exists in the shard or in any other shard before adding.
-	SHARDS[shardID] = append(SHARDS[shardID], requestBody.SocketAddress)
+	SHARDS[shardID] = append(SHARDS[shardID], input.SocketAddress)
 
-	// Optionally, you might want to update any distributed state or notify the system of the change.
-	// This could involve sending a message to the newly added node or to a central coordinator, depending on your architecture.
-
+	// If the request is not from anotehr replica, then broadcast the new addition to all other nodes
+	if input.FromRepilca == "" {
+		// Create JSON payload to be sent to other nodes
+		payload := map[string]interface{}{"socket-address": input.SocketAddress, "from-replica": SOCKET_ADDRESS}
+		jsonBytes, err := json.Marshal(payload)
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, "Failed to convert JSON payload to string")
+		}
+		broadcast("PUT", "shard/add-member/"+shardID, jsonBytes, CURRENT_VIEW)
+	}
 	// Return a success response.
 	return c.JSON(http.StatusOK, map[string]string{"result": "Node added to shard"})
 }
