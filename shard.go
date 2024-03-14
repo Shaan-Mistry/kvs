@@ -91,11 +91,6 @@ func addNodeToShard(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string][]string{"view": CURRENT_VIEW})
 }
 
-// Define JSON body for kvs GET and DELETE requests
-type Reshard_Request struct {
-	ShardCount int `json:"shard-count"`
-}
-
 // Define private endpoint for updating kvs for resharding
 // PUT /shard/kvs-update/<key>
 func updateKvsForResharding(c echo.Context) error {
@@ -118,13 +113,19 @@ func updateKvsForResharding(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{"result": "updated"})
 }
 
+// Define JSON body for kvs GET and DELETE requests
+type Reshard_Request struct {
+	ShardCount  int    `json:"shard-count"`
+	FromRepilca string `json:"from-replica,omitempty"`
+}
+
 // PUT /shard/reshard
 // JSON body {"shard-count": <INTEGER>}
 // Trigger a reshard into <INTEGER> shards
 func reshard(c echo.Context) error {
-	fmt.Printf("\nResharding\n")
-	fmt.Printf("\nCurrent View: %v\n", CURRENT_VIEW)
-	fmt.Printf("\nCurrent Shards: %v\n", SHARDS)
+	// fmt.Printf("\nResharding\n")
+	// fmt.Printf("\nCurrent View: %v\n", CURRENT_VIEW)
+	// fmt.Printf("\nCurrent Shards: %v\n", SHARDS)
 	// Read JSON from request body
 	body, err := io.ReadAll(c.Request().Body)
 
@@ -173,6 +174,8 @@ func reshard(c echo.Context) error {
 			// Add a free node to each new shard
 			SHARDS[shardid] = append(SHARDS[shardid], availableNodes[0])
 			availableNodes = availableNodes[1:]
+			// Add the new shard to the hash ring
+			HASH_RING.Add(myMember(shardid))
 		}
 
 		// Update the key-value based on the new shard partitions
@@ -186,21 +189,18 @@ func reshard(c echo.Context) error {
 				// Build http method to send
 				// Create the url using the current address
 				url := fmt.Sprintf("http://%s/%s", choseNodeFromShard(shardid), "shard/kvs-update/"+key)
-				// Create the JSON body to send
-				payload := map[string]string{"key": key, "value": value.Data.(string), "type": value.Type, "causal-metadata": ""}
-
-				jsonPayload, _ := json.Marshal(payload)
+				payload := map[string]interface{}{"value": value.Data, "type": value.Type, "causal-metadata": "", "from-replica": SOCKET_ADDRESS}
+				jsonBytes, _ := json.Marshal(payload)
+				fmt.Println(string(jsonBytes))
 				// Build the http request
-				request, _ := http.NewRequest("PUT", url, bytes.NewBuffer(jsonPayload))
+				request, _ := http.NewRequest("PUT", url, bytes.NewBuffer(jsonBytes))
 				// Forward the request to the appropriate shard
+				fmt.Printf("\nForwarding request to %s\n", choseNodeFromShard(shardid))
 				send(request)
 			}
 
 		}
 		// Delete the key from the shard
-
-		fmt.Printf("\nSHARDS before distribution\n")
-		fmt.Printf("\n%v\n", SHARDS)
 
 		// Evenly distribute rest of the nodes back to the shards
 		distributeNodesIntoShards(targetNumShards, availableNodes)
@@ -208,15 +208,20 @@ func reshard(c echo.Context) error {
 		// Sync the nodes within their shards
 
 		// broadcast reshard to all nodes
+		if input.FromRepilca == "" {
+			payload := map[string]interface{}{"shard-count": targetNumShards, "from-replica": SOCKET_ADDRESS}
+			jsonBytes, _ := json.Marshal(payload)
+			broadcast("PUT", "shard/reshard", jsonBytes, CURRENT_VIEW)
+		}
 
 		//oldRing := HASH_RING
 		// Update the hash ring
 		//HASH_RING = createHashRing()
 	}
 
-	fmt.Printf("\nFinished Resharding\n")
-	fmt.Printf("\nCurrent View: %v\n", CURRENT_VIEW)
-	fmt.Printf("\nCurrent Shards: %v\n", SHARDS)
+	// fmt.Printf("\nFinished Resharding\n")
+	// fmt.Printf("\nCurrent View: %v\n", CURRENT_VIEW)
+	// fmt.Printf("\nCurrent Shards: %v\n", SHARDS)
 
 	return c.JSON(http.StatusOK, map[string]string{"result": "resharded"})
 }
