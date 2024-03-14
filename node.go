@@ -91,7 +91,6 @@ func main() {
 	syncMyself(SHARD_COUNT)
 	// Store my shard id
 	updateMyShardID()
-	fmt.Printf("\nShard Map: %v\n", SHARDS)
 	fmt.Printf("\nMy ShardID: %s\n", MY_SHARD_ID)
 	// Create a hash ring to represent the distribution of shards
 	HASH_RING = createHashRing()
@@ -111,8 +110,7 @@ func main() {
 			if v.URI == "/view" || v.URI == "/sync" {
 				return nil
 			}
-			fmt.Printf("%v %s %v status: %v kvs: %v, shardMap: %v", v.RemoteIP, v.Method, v.URI, v.Status, KVStore, SHARDS)
-			println()
+			fmt.Printf("%v %s %v status: %v kvs: %v\n shardMap: %v\n\n", v.RemoteIP, v.Method, v.URI, v.Status, KVStore, SHARDS)
 			return nil
 		},
 	}))
