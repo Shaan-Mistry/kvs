@@ -348,7 +348,6 @@ func syncWithShard(shardId string) error {
 	resp, err := sendToAny("GET", "sync", nil, SHARDS[shardId])
 	// If we successfully got a response from any node in the shard, update the current node's state
 	if err == nil {
-		println("Syncing with shard")
 		defer resp.Body.Close()
 		// Parse the response body into a Sync_Data struct
 		var syncData Sync_Data
@@ -358,7 +357,6 @@ func syncWithShard(shardId string) error {
 		updateCurrentNodeState(syncData)
 		return nil
 	}
-	println("Failed to sync with shard")
 	// Else initialize node with empty state
 	initializeEmptyNode()
 	return nil
