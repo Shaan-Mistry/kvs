@@ -95,10 +95,52 @@ func getMembersOfShard(c echo.Context) error {
 // GET /shard/key-count/<ID>
 // Returns the number of key-value pairs stored by the indicated shard
 func getShardKeyCount(c echo.Context) error {
+	shardID := c.Param("id")
+	// Check if the shard exists
+	if _, exists := SHARDS[shardID]; !exists {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "Shard ID not found"})
+	}
 
+	// Check if this node belongs to the shard
+	if shardID == MY_SHARD_ID {
+		// Count the number of key-value pairs that belong to this shard
+		count := 0
+		for key := range KVStore {
+			keyByte := []byte(key)
+			if HASH_RING.LocateKey(keyByte).String() == shardID {
+				count++
+			}
+		}
+		return c.JSON(http.StatusOK, map[string]int{"shard-key-count": count})
+	} else {
+		// Forward the request to a node in the shard
+		chosenNode := choseNodeFromShard(shardID)
+		if chosenNode == "" {
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "No node available in the shard"})
+		}
+		return forwardRequestToShard(c, chosenNode, "/shard/key-count/"+shardID)
+	}
+}
+func forwardRequestToShard(c echo.Context, nodeAddress, endpoint string) error {
+	// Create the full URL
+	url := "http://" + nodeAddress + endpoint
 	// Send request to node in indicated shard
 
-	return c.JSON(http.StatusOK, map[string][]string{"view": CURRENT_VIEW})
+	// Forward the GET request
+	resp, err := http.Get(url)
+	if err != nil {
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "Failed to forward request"})
+	}
+	defer resp.Body.Close()
+
+	// Read the response body
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to read response from node"})
+	}
+
+	// Directly forward the status code and response body received from the chosen node
+	return c.JSONBlob(resp.StatusCode, body)
 }
 
 // Define a structure to parse the request body.
