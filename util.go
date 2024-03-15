@@ -111,7 +111,6 @@ func broadcast(method string, endpoint string, jsonData []byte, nodes []string) 
 		}
 		// Send request to current replica
 		go send(request)
-		//time.Sleep(10 * time.Millisecond)
 	}
 	return nil
 }

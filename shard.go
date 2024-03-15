@@ -272,7 +272,6 @@ func reshard(c echo.Context) error {
 		// Delete the shard from my KVStore
 		if shardid != MY_SHARD_ID {
 			delete(KVStore, key)
-
 		}
 	}
 	// Unlock after accessing the KVStore

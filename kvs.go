@@ -172,8 +172,12 @@ func getKey(c echo.Context) error {
 		}
 	}
 
+	// Lock before accessing the KVStore
+	KVSmutex.Lock()
 	// Check if key exists
 	value, ok := KVStore[key]
+	// Unlock after accessing the KVStore
+	KVSmutex.Unlock()
 	if !ok {
 		return c.JSON(http.StatusNotFound, map[string]string{"error": "Key does not exist"})
 	}
