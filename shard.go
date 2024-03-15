@@ -195,32 +195,6 @@ func addNodeToShard(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{"result": "Node added to shard"})
 }
 
-// Define private endpoint for updating kvs for resharding
-// PUT /shard/kvs-update/<key>
-func updateKvsForResharding(c echo.Context) error {
-	// Store key value
-	key := c.Param("key")
-	// Read JSON from request body
-	body, err := io.ReadAll(c.Request().Body)
-	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Failed to read request body"})
-	}
-	// Unmarshal JSON
-	var input KVS_PUT_Request
-	jsonErr := json.Unmarshal(body, &input)
-	if jsonErr != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid JSON format"})
-	}
-	// Lock before accessing the KVStore
-	KVSmutex.Lock()
-	// Update or create key-value mapping
-	KVStore[key] = Value{input.Data, input.Type}
-	// Unlock after accessing the KVStore
-	KVSmutex.Unlock()
-	// Return success
-	return c.JSON(http.StatusOK, map[string]string{"result": "updated"})
-}
-
 // Define JSON body for kvs GET and DELETE requests
 type Reshard_Request struct {
 	ShardCount  int    `json:"shard-count"`
@@ -268,7 +242,7 @@ func reshard(c echo.Context) error {
 		payload := map[string]interface{}{"value": value.Data, "type": value.Type, "causal-metadata": "", "from-replica": SOCKET_ADDRESS}
 		jsonBytes, _ := json.Marshal(payload)
 		// Forward the request to the appropriate shard
-		broadcast("PUT", "shard/kvs-update/"+key, jsonBytes, SHARDS[shardid])
+		broadcastTest("PUT", "/kvs/"+key, jsonBytes, SHARDS[shardid])
 		// Delete the shard from my KVStore
 		if shardid != MY_SHARD_ID {
 			delete(KVStore, key)
@@ -280,7 +254,7 @@ func reshard(c echo.Context) error {
 	if input.FromRepilca == "" {
 		input.FromRepilca = SOCKET_ADDRESS
 		jsonBytes, _ := json.Marshal(input)
-		broadcast("PUT", "shard/reshard", jsonBytes, CURRENT_VIEW)
+		broadcastTest("PUT", "shard/reshard", jsonBytes, CURRENT_VIEW)
 	}
 	// Return success
 	return c.JSON(http.StatusOK, map[string]string{"result": "resharded"})

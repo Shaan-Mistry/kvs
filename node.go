@@ -139,7 +139,6 @@ func main() {
 	e.GET("/shard/key-count/:id", getShardKeyCount)
 	e.PUT("/shard/add-member/:id", addNodeToShard)
 	e.PUT("shard/reshard", reshard)
-	e.PUT("shard/kvs-update/:key", updateKvsForResharding)
 	// Define /sync endpoint for syncing new nodes
 	e.GET("/sync", syncHandler)
 	// Build the JSON body to be sent: {"socket-address":"<IP:PORT>"}

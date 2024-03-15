@@ -115,6 +115,27 @@ func broadcast(method string, endpoint string, jsonData []byte, nodes []string) 
 	return nil
 }
 
+func broadcastTest(method string, endpoint string, jsonData []byte, nodes []string) error {
+	// Broadcast request to all replicas
+	for _, address := range nodes {
+		// Dont broacast to youself
+		if address == SOCKET_ADDRESS {
+			continue
+		}
+		// Create the url using the current address
+		url := fmt.Sprintf("http://%s/%s", address, endpoint)
+		// Build the http request
+		request, err := http.NewRequest(method, url, bytes.NewBuffer(jsonData))
+		request.RemoteAddr = address
+		if err != nil {
+			return err
+		}
+		// Send request to current replica
+		send(request)
+	}
+	return nil
+}
+
 // Checks the following condition
 // VC[m][k] = VC[p][k] + 1,  where k is the sender’s position
 // VC[m][k] <= VC[p][k]  ,   for every other k
