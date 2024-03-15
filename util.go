@@ -165,7 +165,7 @@ func syncMyself(shardCount int) {
 	distributeNodesIntoShards(shardCount, CURRENT_VIEW)
 
 	// Look for a node to sync with
-	for _, address := range CURRENT_VIEW {
+	for _, address := range SHARDS[MY_SHARD_ID] {
 		// Dont sync with yourself
 		if address == SOCKET_ADDRESS {
 			continue

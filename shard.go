@@ -95,53 +95,10 @@ func getMembersOfShard(c echo.Context) error {
 // GET /shard/key-count/<ID>
 // Returns the number of key-value pairs stored by the indicated shard
 func getShardKeyCount(c echo.Context) error {
-	shardID := c.Param("id")
-	// Check if the shard exists
-	if _, exists := SHARDS[shardID]; !exists {
-		return c.JSON(http.StatusNotFound, map[string]string{"error": "Shard ID not found"})
-	}
 
-	// Check if this node belongs to the shard
-	if shardID == MY_SHARD_ID {
-		// Count the number of key-value pairs that belong to this shard
-		count := 0
-		for key := range KVStore {
-			keyByte := []byte(key)
-			if HASH_RING.LocateKey(keyByte).String() == shardID {
-				count++
-			}
-		}
-		return c.JSON(http.StatusOK, map[string]int{"shard-key-count": count})
-	} else {
-		// Forward the request to a node in the shard
-		chosenNode := choseNodeFromShard(shardID)
-		if chosenNode == "" {
-			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "No node available in the shard"})
-		}
-		return forwardRequestToShard(c, chosenNode, "/shard/key-count/"+shardID)
-	}
-}
+	// Send request to node in indicated shard
 
-// Forward the request to a node in the shard for /shard/key-count
-func forwardRequestToShard(c echo.Context, nodeAddress, endpoint string) error {
-	// Create the full URL
-	url := "http://" + nodeAddress + endpoint
-
-	// Forward the GET request
-	resp, err := http.Get(url)
-	if err != nil {
-		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "Failed to forward request"})
-	}
-	defer resp.Body.Close()
-
-	// Read the response body
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to read response from node"})
-	}
-
-	// Directly forward the status code and response body received from the chosen node
-	return c.JSONBlob(resp.StatusCode, body)
+	return c.JSON(http.StatusOK, map[string][]string{"view": CURRENT_VIEW})
 }
 
 // Define a structure to parse the request body.
@@ -168,14 +125,19 @@ func addNodeToShard(c echo.Context) error {
 	if jsonErr != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid JSON format"})
 	}
-	// Check if the shard exists.
+	// Check if the shard exists
 	if _, exists := SHARDS[shardID]; !exists {
 		// If the shard doesn't exist, return a not found response.
 		return c.JSON(http.StatusNotFound, map[string]string{"error": "Shard ID not found"})
 	}
-	// Add the node to the shard.
-	// You might also want to check if the node already exists in the shard or in any other shard before adding.
+	// Add the node to the shard
 	SHARDS[shardID] = append(SHARDS[shardID], input.SocketAddress)
+
+	// If I am the node that is being added, sync myself with the shard I am assigned to
+	if input.SocketAddress == SOCKET_ADDRESS {
+		// Update my shard id in MY_SHARD_ID
+		syncWithShard()
+	}
 
 	// If the request is not from anotehr replica, then broadcast the new addition to all other nodes
 	if input.FromRepilca == "" {
