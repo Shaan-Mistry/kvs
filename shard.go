@@ -199,8 +199,8 @@ func reshard(c echo.Context) error {
 	numNodes := len(CURRENT_VIEW)
 	currNumShards := len(HASH_RING.GetMembers())
 	targetNumShards := input.ShardCount
-
-	if targetNumShards > currNumShards && numNodes/targetNumShards < 2 {
+	// Check if the number of shards is valid
+	if targetNumShards < 1 || (targetNumShards > currNumShards && numNodes/targetNumShards < 2) {
 		// Check if there are enough nodes to provide fault tolerance with the requested shard count
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Not enough nodes to provide fault tolerance with requested shard count"})
 	}
