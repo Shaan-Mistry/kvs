@@ -138,10 +138,6 @@ func getKey(c echo.Context) error {
 	keyByte := []byte(key)
 	shardid := HASH_RING.LocateKey(keyByte).String()
 
-	if shardid != MY_SHARD_ID {
-		return forwardRequest(c, choseNodeFromShard(shardid), "kvs/"+key, nil)
-	}
-
 	// Read JSON from request body
 	body, err := io.ReadAll(c.Request().Body)
 	if err != nil {
@@ -152,6 +148,10 @@ func getKey(c echo.Context) error {
 	jsonErr := json.Unmarshal(body, &input)
 	if jsonErr != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid JSON format"})
+	}
+
+	if shardid != MY_SHARD_ID {
+		return forwardRequest(c, choseNodeFromShard(shardid), "kvs/"+key, body)
 	}
 
 	// Handle the causal metadata to ensure causal consistency
