@@ -166,8 +166,8 @@ func getKey(c echo.Context) error {
 		// Check if clients request is deliverable based on its vector clock
 		// if recieverVC ---> clientVc return error
 		// If the replica is less updated than the client, it cant deliver the message
-		if !(senderVC.Compare(MY_VECTOR_CLOCK, vclock.Concurrent) || senderVC.Compare(MY_VECTOR_CLOCK, vclock.Equal)) {
-			return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "Causal dependencies not satisfied; try again later"})
+		if !(senderVC.Compare(MY_VECTOR_CLOCK, vclock.Concurrent) || senderVC.Compare(MY_VECTOR_CLOCK, vclock.Equal) || senderVC.Compare(MY_VECTOR_CLOCK, vclock.Descendant)) {
+			return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "Causal dependencies not satisfied; try again later", "vc": MY_VECTOR_CLOCK.ReturnVCString()})
 		}
 	}
 
