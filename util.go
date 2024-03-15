@@ -264,24 +264,17 @@ func choseNodeFromShard(shardid string) string {
 }
 
 // Forward the request to specified address
-func forwardRequest(c echo.Context, address string) error {
+func forwardRequest(c echo.Context, address string, endpoint string, jsonData []byte) error {
 	// Store HTTP method type (GET, PUT, DELETE)
-	httpMethod := c.Request().Method
-	// Store key
-	key := c.Param("key")
+	method := c.Request().Method
 
-	// Read the body of the incoming request
-	body, err := io.ReadAll(c.Request().Body)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "Failed to read request body")
-	}
-	// Create a new request to forward the Main Instance
-	url := fmt.Sprintf("http://%s/kvs/%s", address, key)
-	req, err := http.NewRequest(httpMethod, url, bytes.NewReader(body))
+	// Create a new request to forward the address
+	url := fmt.Sprintf("http://%s/%s", address, endpoint)
+	req, err := http.NewRequest(method, url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to create forwarding request")
 	}
-	// Send the request to Main Instance using an http.Client
+	// Send the request to the address using an http.Client
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -295,7 +288,6 @@ func forwardRequest(c echo.Context, address string) error {
 	}
 	// Send the response back to the client
 	return c.Blob(resp.StatusCode, "application/json", respBody)
-
 }
 
 // Syncs the current node's state with one other node in the same shard

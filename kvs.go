@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 
@@ -26,28 +27,38 @@ type KVS_GET_DELETE_Request struct {
 // PUT /kvs/<key>
 // Add a key-value to the database
 func putKey(c echo.Context) error {
+	// Read JSON from request body
+	body, err := io.ReadAll(c.Request().Body)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Failed to read request body"})
+	}
+	// Parse JSON body
+	var input KVS_PUT_Request
+	jsonErr := json.Unmarshal(body, &input)
+	if jsonErr != nil {
+		fmt.Printf("JSON BODY: %s\n", string(body))
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid JSON format"})
+	}
 	// Check which shard the key belongs to
 	key := c.Param("key")
 	keyByte := []byte(key)
 	shardid := HASH_RING.LocateKey(keyByte).String()
 
-	// If shardid is NOT the same as MY_SHARD_ID, then forward the request to the appropriate shard
+	// Check if shardid is NOT the same as MY_SHARD_ID
 	if shardid != MY_SHARD_ID {
-		return forwardRequest(c, choseNodeFromShard(shardid))
+		// If input is from another replica, update the vector clock and return
+		if input.FromRepilca != "" {
+			senderVC, err := NewVClockFromString(input.CausalMetaData)
+			if err != nil {
+				return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid metadata format"})
+			}
+			MY_VECTOR_CLOCK.Merge(senderVC)
+			return c.JSON(http.StatusOK, map[string]string{"result": "vector clock updated"})
+		} else {
+			return forwardRequest(c, choseNodeFromShard(shardid), "kvs/"+key, body)
+		}
 	}
 
-	// Read JSON from request body
-	body, err := io.ReadAll(c.Request().Body)
-
-	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Failed to read request body"})
-	}
-
-	var input KVS_PUT_Request
-	jsonErr := json.Unmarshal(body, &input)
-	if jsonErr != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid JSON format"})
-	}
 	// Validate key length
 	if len(key) > 50 {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Key is too long"})
@@ -99,7 +110,7 @@ func putKey(c echo.Context) error {
 		input.FromRepilca = SOCKET_ADDRESS
 		input.CausalMetaData = MY_VECTOR_CLOCK.ReturnVCString()
 		jsonData, _ := json.Marshal(input)
-		go broadcast("PUT", "kvs/"+key, jsonData, SHARDS[MY_SHARD_ID])
+		go broadcast("PUT", "kvs/"+key, jsonData, CURRENT_VIEW)
 	}
 
 	// Check if the key existed before the update
@@ -127,9 +138,8 @@ func getKey(c echo.Context) error {
 	keyByte := []byte(key)
 	shardid := HASH_RING.LocateKey(keyByte).String()
 
-	// If shardid is NOT the same as MY_SHARD_ID, then forward the request to the appropriate shard
 	if shardid != MY_SHARD_ID {
-		return forwardRequest(c, choseNodeFromShard(shardid))
+		return forwardRequest(c, choseNodeFromShard(shardid), "kvs/"+key, nil)
 	}
 
 	// Read JSON from request body
@@ -179,26 +189,33 @@ func getKey(c echo.Context) error {
 // DELETE /kvs/<key>
 // Delete the indicateed key from the database
 func deleteKey(c echo.Context) error {
-	// Check which shard the key belongs to
-	key := c.Param("key")
-	keyByte := []byte(key)
-	shardid := HASH_RING.LocateKey(keyByte).String()
-
-	// If shardid is NOT the same as MY_SHARD_ID, then forward the request to the appropriate shard
-	if shardid != MY_SHARD_ID {
-		return forwardRequest(c, choseNodeFromShard(shardid))
-	}
-
 	// Read JSON from request body
 	body, err := io.ReadAll(c.Request().Body)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Failed to read request body"})
 	}
-
+	// Parse JSON body
 	var input KVS_GET_DELETE_Request
 	jsonErr := json.Unmarshal(body, &input)
 	if jsonErr != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid JSON format"})
+	}
+	// Check which shard the key belongs to
+	key := c.Param("key")
+	keyByte := []byte(key)
+	shardid := HASH_RING.LocateKey(keyByte).String()
+	// If shardid is NOT the same as MY_SHARD_ID, then forward the request to the appropriate shard
+	if shardid != MY_SHARD_ID {
+		if input.FromRepilca != "" {
+			senderVC, err := NewVClockFromString(input.CausalMetaData)
+			if err != nil {
+				return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid metadata format"})
+			}
+			MY_VECTOR_CLOCK.Merge(senderVC)
+			return c.JSON(http.StatusOK, map[string]string{"result": "vector clock updated"})
+		} else {
+			return forwardRequest(c, choseNodeFromShard(shardid), "kvs/"+key, body)
+		}
 	}
 
 	// Handle the causal metadata to ensure causal consistency
@@ -242,7 +259,7 @@ func deleteKey(c echo.Context) error {
 		input.FromRepilca = SOCKET_ADDRESS
 		input.CausalMetaData = MY_VECTOR_CLOCK.ReturnVCString()
 		jsonData, _ := json.Marshal(input)
-		go broadcast("PUT", "kvs/"+key, jsonData, SHARDS[MY_SHARD_ID])
+		go broadcast("PUT", "kvs/"+key, jsonData, CURRENT_VIEW)
 	}
 
 	// Check if key exists
