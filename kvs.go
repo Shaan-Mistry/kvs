@@ -125,9 +125,9 @@ func putKey(c echo.Context) error {
 
 	// Return response with the appropriate status
 	if existed {
-		return c.JSON(http.StatusOK, map[string]string{"result": "replaced", "causal-metadata": MY_VECTOR_CLOCK.ReturnVCString()})
+		return c.JSON(http.StatusOK, map[string]string{"result": "replaced", "causal-metadata": MY_VECTOR_CLOCK.ReturnVCString(), "shard-id": MY_SHARD_ID})
 	}
-	return c.JSON(http.StatusCreated, map[string]string{"result": "created", "causal-metadata": MY_VECTOR_CLOCK.ReturnVCString()})
+	return c.JSON(http.StatusCreated, map[string]string{"result": "created", "causal-metadata": MY_VECTOR_CLOCK.ReturnVCString(), "shard-id": MY_SHARD_ID})
 }
 
 // GET /kvs/<key>
@@ -183,6 +183,7 @@ func getKey(c echo.Context) error {
 		"result":          "found",
 		"value":           value.Data,
 		"causal-metadata": MY_VECTOR_CLOCK.ReturnVCString(),
+		"shard-id":        MY_SHARD_ID,
 	})
 }
 
@@ -276,5 +277,5 @@ func deleteKey(c echo.Context) error {
 	KVSmutex.Unlock()
 
 	// Return response
-	return c.JSON(http.StatusOK, map[string]string{"result": "deleted", "causal-metadata": MY_VECTOR_CLOCK.ReturnVCString()})
+	return c.JSON(http.StatusOK, map[string]string{"result": "deleted", "causal-metadata": MY_VECTOR_CLOCK.ReturnVCString(), "shard-id": MY_SHARD_ID})
 }

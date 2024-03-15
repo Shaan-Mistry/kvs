@@ -184,7 +184,7 @@ func addNodeToShard(c echo.Context) error {
 	// If the request is not from anotehr replica, then broadcast the new addition to all other nodes
 	if input.FromRepilca == "" {
 		// Create JSON payload to be sent to other nodes
-		payload := map[string]interface{}{"socket-address": input.SocketAddress, "from-replica": SOCKET_ADDRESS}
+		payload := map[string]string{"socket-address": input.SocketAddress, "from-replica": SOCKET_ADDRESS}
 		jsonBytes, err := json.Marshal(payload)
 		if err != nil {
 			return c.JSON(http.StatusInternalServerError, "Failed to convert JSON payload to string")

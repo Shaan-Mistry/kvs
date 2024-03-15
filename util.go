@@ -34,14 +34,14 @@ func removeFromView(address string) {
 		}
 	}
 	// Remove from SHARDS
-	for shardid, nodes := range SHARDS {
-		for i, addr := range nodes {
-			if addr == address {
-				SHARDS[shardid] = append(nodes[:i], nodes[i+1:]...)
-				break
-			}
-		}
-	}
+	// for shardid, nodes := range SHARDS {
+	// 	for i, addr := range nodes {
+	// 		if addr == address {
+	// 			SHARDS[shardid] = append(nodes[:i], nodes[i+1:]...)
+	// 			break
+	// 		}
+	// 	}
+	// }
 }
 
 // Periodically check if a replica is still alive
@@ -111,7 +111,7 @@ func broadcast(method string, endpoint string, jsonData []byte, nodes []string) 
 		}
 		// Send request to current replica
 		go send(request)
-		time.Sleep(10 * time.Millisecond)
+		//time.Sleep(10 * time.Millisecond)
 	}
 	return nil
 }
