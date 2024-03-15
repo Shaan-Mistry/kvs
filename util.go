@@ -100,7 +100,7 @@ func send(request *http.Request) {
 func broadcast(method string, endpoint string, jsonData []byte, nodes []string) error {
 	// Broadcast request to all replicas
 	for _, address := range nodes {
-		// Dont broacast to youself
+		// Dont broacast to yoruself
 		if address == SOCKET_ADDRESS {
 			continue
 		}
@@ -113,9 +113,38 @@ func broadcast(method string, endpoint string, jsonData []byte, nodes []string) 
 			return err
 		}
 		// Send request to current replica
+		// Print the request
 		go send(request)
 	}
 	return nil
+}
+
+// Given a list of address, try to send a request to one of them
+func sendToAny(method string, endpoint string, jsonData []byte, nodes []string) (*http.Response, error) {
+	client := &http.Client{Timeout: 1 * time.Second}
+	// Broadcast request to all replicas
+	for _, address := range nodes {
+		// Dont send to yourself
+		if address == SOCKET_ADDRESS {
+			continue
+		}
+		// Create the url using the current address
+		url := fmt.Sprintf("http://%s/%s", address, endpoint)
+		// Build the http request
+		request, err := http.NewRequest(method, url, bytes.NewBuffer(jsonData))
+		if err != nil {
+			continue
+		}
+		// Send request to current address
+		resp, err := client.Do(request)
+		if err != nil || resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
+			continue
+		}
+		return resp, err
+	}
+	// Return error as we couln't send to any node
+	return nil, fmt.Errorf("no nodes to send to")
 }
 
 func broadcastTest(method string, endpoint string, jsonData []byte, nodes []string) error {
@@ -314,78 +343,36 @@ func forwardRequest(c echo.Context, address string, endpoint string, jsonData []
 }
 
 // Syncs the current node's state with one other node in the same shard
-func syncWithShard() error {
-	// Check if the current node belongs to a shard
-	if MY_SHARD_ID == "" {
-		return fmt.Errorf("current node does not belong to any shard")
-	}
-
-	// Get the list of nodes in the same shard, excluding the current node
-	nodesInShard := SHARDS[MY_SHARD_ID]
-	var nodeToSync string
-
-	for _, node := range nodesInShard {
-		if node != SOCKET_ADDRESS {
-			nodeToSync = node
-			break // Break after finding the first node that is not the current node
+func syncWithShard(shardId string) error {
+	// Send a GET request to the sync endpoint of a random node in the shard
+	resp, err := sendToAny("GET", "sync", nil, SHARDS[shardId])
+	// If we successfully got a response from any node in the shard, update the current node's state
+	if err == nil {
+		println("Syncing with shard")
+		defer resp.Body.Close()
+		// Parse the response body into a Sync_Data struct
+		var syncData Sync_Data
+		if err := json.NewDecoder(resp.Body).Decode(&syncData); err != nil {
+			return fmt.Errorf("error decoding sync response: %v", err)
 		}
+		updateCurrentNodeState(syncData)
+		return nil
 	}
-
-	if nodeToSync != "" {
-		// If there's at least one other node in the shard, sync with it
-		err := syncNodeState(nodeToSync)
-		if err != nil {
-			fmt.Printf("Failed to sync with node %s: %v\n", nodeToSync, err)
-			return err
-		}
-	} else {
-		// If no other nodes are in the shard, or all nodes are the current node
-		fmt.Println("Initializing as the first node in the shard")
-		initializeShard()
-	}
-
+	println("Failed to sync with shard")
+	// Else initialize node with empty state
+	initializeEmptyNode()
 	return nil
 }
 
-// Initialize the shard when the current node is the first in the shard
-func initializeShard() {
+// Initialize the current node with an empty state
+func initializeEmptyNode() {
 	// Initialize the KV store
 	KVStore = make(map[string]Value)
-
 	// Initialize the vector clock
 	MY_VECTOR_CLOCK = vclock.New()
-
-	// Add the current node to the vector clock
-	MY_VECTOR_CLOCK.Set(SOCKET_ADDRESS, 0)
-}
-
-// Makes a request to another node in the shard to get the current state and updates the current node's state based on the response
-func syncNodeState(targetNodeAddress string) error {
-	client := &http.Client{
-		Timeout: 5 * time.Second, // Adjust the timeout according to your needs
+	for _, address := range CURRENT_VIEW {
+		MY_VECTOR_CLOCK.Set(address, 0)
 	}
-
-	// Make the URL for the sync endpoint of the target node
-	reqURL := fmt.Sprintf("http://%s/sync", targetNodeAddress)
-
-	// Make a GET request to the sync endpoint
-	resp, err := client.Get(reqURL)
-	if err != nil {
-		return fmt.Errorf("failed to fetch state from node %s: %v", targetNodeAddress, err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("received non-OK response from node %s: %s", targetNodeAddress, resp.Status)
-	}
-
-	var syncData Sync_Data
-	if err := json.NewDecoder(resp.Body).Decode(&syncData); err != nil {
-		return fmt.Errorf("error decoding sync response: %v", err)
-	}
-
-	// Parse the received data and update the current node's state
-	return updateCurrentNodeState(syncData)
 }
 
 // Update the current node's state with the received sync data
@@ -414,4 +401,14 @@ func updateCurrentNodeState(syncData Sync_Data) error {
 	SHARDS = newShards // Update the shard information with the new data
 
 	return nil
+}
+
+// Checks if a string is in a slice of strings
+func contains(slice []string, str string) bool {
+	for _, s := range slice {
+		if s == str {
+			return true
+		}
+	}
+	return false
 }

@@ -109,10 +109,10 @@ func main() {
 		LogValuesFunc: func(c echo.Context, v middleware.RequestLoggerValues) error {
 			//vclock, _ := c.Get("vclock").(string)
 			//method := strings.ToUpper(v.Method)
-			if v.URI == "/view" || v.URI == "/sync" {
+			if v.URI == "/view" {
 				return nil
 			}
-			fmt.Printf("%v %s %v status: %v shard: %s  \n shardMap: %v\n\n", v.RemoteIP, v.Method, v.URI, v.Status, MY_SHARD_ID, SHARDS)
+			fmt.Printf("%v %s %v status: %v shard: %s  \n  shardMap: %v\n  view: %v\n\n", v.RemoteIP, v.Method, v.URI, v.Status, MY_SHARD_ID, SHARDS, CURRENT_VIEW)
 			return nil
 		},
 	}))
