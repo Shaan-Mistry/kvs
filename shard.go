@@ -41,9 +41,9 @@ func (h hasher) Sum64(data []byte) uint64 {
 func createHashRing() *consistent.Consistent {
 	// Create a new consistent instance
 	cfg := consistent.Config{
-		PartitionCount:    7,
-		ReplicationFactor: 20,
-		Load:              1.25,
+		PartitionCount:    11,
+		ReplicationFactor: 5,
+		Load:              1.10,
 		Hasher:            hasher{},
 	}
 	hashRing := consistent.New(nil, cfg)
@@ -195,6 +195,32 @@ func addNodeToShard(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{"result": "Node added to shard"})
 }
 
+// Define private endpoint for updating kvs for resharding
+// PUT /shard/kvs-update/<key>
+func updateKvsForResharding(c echo.Context) error {
+	// Store key value
+	key := c.Param("key")
+	// Read JSON from request body
+	body, err := io.ReadAll(c.Request().Body)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Failed to read request body"})
+	}
+	// Unmarshal JSON
+	var input KVS_PUT_Request
+	jsonErr := json.Unmarshal(body, &input)
+	if jsonErr != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid JSON format"})
+	}
+	// Lock before accessing the KVStore
+	KVSmutex.Lock()
+	// Update or create key-value mapping
+	KVStore[key] = Value{input.Data, input.Type}
+	// Unlock after accessing the KVStore
+	KVSmutex.Unlock()
+	// Return success
+	return c.JSON(http.StatusOK, map[string]string{"result": "updated"})
+}
+
 // Define JSON body for kvs GET and DELETE requests
 type Reshard_Request struct {
 	ShardCount  int    `json:"shard-count"`
@@ -239,10 +265,10 @@ func reshard(c echo.Context) error {
 		keyByte := []byte(key)
 		shardid := HASH_RING.LocateKey(keyByte).String()
 		// Forward a private PUT KVS request to the appropriate shard
-		payload := map[string]interface{}{"value": value.Data, "type": value.Type, "causal-metadata": "", "from-replica": SOCKET_ADDRESS}
+		payload := map[string]interface{}{"value": value.Data, "causal-metadata": nil, "from-replica": SOCKET_ADDRESS}
 		jsonBytes, _ := json.Marshal(payload)
 		// Forward the request to the appropriate shard
-		broadcastTest("PUT", "/kvs/"+key, jsonBytes, SHARDS[shardid])
+		broadcastTest("PUT", "shard/kvs-update/"+key, jsonBytes, SHARDS[shardid])
 		// Delete the shard from my KVStore
 		if shardid != MY_SHARD_ID {
 			delete(KVStore, key)

@@ -16,6 +16,9 @@ import (
 func NewVClockFromString(vcStr string) (vclock.VClock, error) {
 	// Initialize an empty map to hold the deserialized data
 	vcMap := make(map[string]uint64)
+	if vcStr == "" {
+		return vcMap, nil
+	}
 	// Unmarshal the JSON string into the map
 	err := json.Unmarshal([]byte(vcStr), &vcMap)
 	// Create a new VClock object from the vcMap

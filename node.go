@@ -112,7 +112,7 @@ func main() {
 			if v.URI == "/view" || v.URI == "/sync" {
 				return nil
 			}
-			fmt.Printf("%v %s %v status: %v shard: %s \nkvs: %v\n shardMap: %v\n\n", v.RemoteIP, v.Method, v.URI, v.Status, MY_SHARD_ID, KVStore, SHARDS)
+			fmt.Printf("%v %s %v status: %v shard: %s  \n shardMap: %v\n\n", v.RemoteIP, v.Method, v.URI, v.Status, MY_SHARD_ID, SHARDS)
 			return nil
 		},
 	}))
@@ -139,6 +139,7 @@ func main() {
 	e.GET("/shard/key-count/:id", getShardKeyCount)
 	e.PUT("/shard/add-member/:id", addNodeToShard)
 	e.PUT("shard/reshard", reshard)
+	e.PUT("/shard/kvs-update/:key", updateKvsForResharding)
 	// Define /sync endpoint for syncing new nodes
 	e.GET("/sync", syncHandler)
 	// Build the JSON body to be sent: {"socket-address":"<IP:PORT>"}

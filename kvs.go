@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 
@@ -35,8 +34,8 @@ func putKey(c echo.Context) error {
 	// Parse JSON body
 	var input KVS_PUT_Request
 	jsonErr := json.Unmarshal(body, &input)
+	//Print the json input
 	if jsonErr != nil {
-		fmt.Printf("JSON BODY: %s\n", string(body))
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid JSON format"})
 	}
 	// Check which shard the key belongs to
