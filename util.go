@@ -256,7 +256,7 @@ func updateMyShardID() {
 	MY_SHARD_ID = ""
 }
 
-// Chose a random node from the inputted shardid
+// Chose a random node from the inputted shard id
 func choseNodeFromShard(shardid string) string {
 	// Add loop thing if its works then break or whatever
 	nodes := SHARDS[shardid]
@@ -296,4 +296,107 @@ func forwardRequest(c echo.Context, address string) error {
 	// Send the response back to the client
 	return c.Blob(resp.StatusCode, "application/json", respBody)
 
+}
+
+// Syncs the current node's state with one other node in the same shard
+func syncWithShard() error {
+	// Check if the current node belongs to a shard
+	if MY_SHARD_ID == "" {
+		return fmt.Errorf("current node does not belong to any shard")
+	}
+
+	// Get the list of nodes in the same shard, excluding the current node
+	nodesInShard := SHARDS[MY_SHARD_ID]
+	var nodeToSync string
+
+	for _, node := range nodesInShard {
+		if node != SOCKET_ADDRESS {
+			nodeToSync = node
+			break // Break after finding the first node that is not the current node
+		}
+	}
+
+	if nodeToSync != "" {
+		// If there's at least one other node in the shard, sync with it
+		err := syncNodeState(nodeToSync)
+		if err != nil {
+			fmt.Printf("Failed to sync with node %s: %v\n", nodeToSync, err)
+			return err
+		}
+	} else {
+		// If no other nodes are in the shard, or all nodes are the current node
+		fmt.Println("Initializing as the first node in the shard")
+		initializeShard()
+	}
+
+	return nil
+}
+
+// Initialize the shard when the current node is the first in the shard
+func initializeShard() {
+	// Initialize the KV store
+	KVStore = make(map[string]Value)
+
+	// Initialize the vector clock
+	MY_VECTOR_CLOCK = vclock.New()
+
+	// Add the current node to the vector clock
+	MY_VECTOR_CLOCK.Set(SOCKET_ADDRESS, 0)
+}
+
+// Makes a request to another node in the shard to get the current state and updates the current node's state based on the response
+func syncNodeState(targetNodeAddress string) error {
+	client := &http.Client{
+		Timeout: 5 * time.Second, // Adjust the timeout according to your needs
+	}
+
+	// Make the URL for the sync endpoint of the target node
+	reqURL := fmt.Sprintf("http://%s/sync", targetNodeAddress)
+
+	// Make a GET request to the sync endpoint
+	resp, err := client.Get(reqURL)
+	if err != nil {
+		return fmt.Errorf("failed to fetch state from node %s: %v", targetNodeAddress, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("received non-OK response from node %s: %s", targetNodeAddress, resp.Status)
+	}
+
+	var syncData Sync_Data
+	if err := json.NewDecoder(resp.Body).Decode(&syncData); err != nil {
+		return fmt.Errorf("error decoding sync response: %v", err)
+	}
+
+	// Parse the received data and update the current node's state
+	return updateCurrentNodeState(syncData)
+}
+
+// Update the current node's state with the received sync data
+func updateCurrentNodeState(syncData Sync_Data) error {
+	// Updating KVS
+	var newKVS map[string]Value
+	err := json.Unmarshal([]byte(syncData.KvsSync), &newKVS)
+	if err != nil {
+		return fmt.Errorf("error updating KVStore from string: %v", err)
+	}
+	KVStore = newKVS // Update the KVStore with the new data
+
+	// Updating VC
+	newVClock, err := NewVClockFromString(syncData.VectorClockStr)
+	if err != nil {
+		return fmt.Errorf("error creating vector clock from string: %v", err)
+	}
+	MY_VECTOR_CLOCK = newVClock // Update the local vector clock with the new data
+
+	// Updating SHARDS
+	var newShards map[string][]string
+	err = json.Unmarshal([]byte(syncData.ShardsString), &newShards)
+	if err != nil {
+		return fmt.Errorf("error updating shards from string: %v", err)
+	}
+	SHARDS = newShards // Update the shard information with the new data
+
+	return nil
 }
