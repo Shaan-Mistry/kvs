@@ -23,7 +23,7 @@ A Stack Overflow discussion on managing goroutines that remain in an I/O wait st
 
 ## README Team Contributions
 
- **Shaan Mistry:** Docker setup, Key Value Operations, Reshard, Testing
+ **Shaan Mistry:** Docker setup, Key Value Operations, Reshard, Testing <br />
  **Aryan Patel:** Shard Operations, Synchronization Methods, Testing
 
 ## Key-to-Shard Mapping Mechanism
