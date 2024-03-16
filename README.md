@@ -4,7 +4,7 @@
 
 **Aneesh Thippa:** We talked to Aneesh Thippa during our brainstorming sessions where we would discuss potential edge cases and possible ways to approach solving the resharding part of our project. 
 
-## README Citations
+## Citations
 
 ### Echo Framework
 - [Echo GitHub Repository](https://github.com/labstack/echo)
@@ -21,7 +21,7 @@ A Go implementation of the xxHash algorithm, known for its speed and low collisi
 A Stack Overflow discussion on managing goroutines that remain in an I/O wait state for an extended period, offering insights and solutions for common concurrency and synchronization challenges in Go.
 - [Stack Overflow Thread](https://stackoverflow.com/questions/42238695/goroutine-in-io-wait-state-for-long-time)
 
-## README Team Contributions
+## Team Contributions
 
  **Shaan Mistry:** Docker setup, Key Value Operations, Reshard, Testing <br />
  **Aryan Patel:** Shard Operations, Synchronization Methods, Testing
@@ -41,7 +41,7 @@ The hash ring is managed by the `consistent.Consistent` struct, which is configu
 
 We chose consistent hashing for its scalability and fault tolerance. By distributing data across shards we make sure that the system can easily scale horizontally.
 
-## README Resharding Mechanism
+## Resharding Mechanism
 
 The resharding mechanism allows our system to adjust the number of shards to accommodate changes in load or capacity. In this we redistribute keys across the new set of shards and update the consistent hashing ring accordingly.
 
