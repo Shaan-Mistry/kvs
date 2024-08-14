@@ -1,4 +1,4 @@
-# CSE138_Assignment4
+# Distributed Key-Value Store
 
 ## Acknowledgements
 
